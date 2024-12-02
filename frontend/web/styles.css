@@ -1,4 +1,4 @@
-/* Allgemeines Styling für Dark Mode */
+/* Allgemeines Styling für Desktop */
 body {
   font-family: 'Roboto', sans-serif;
   margin: 0;
@@ -7,17 +7,18 @@ body {
   color: #ffffff;
   display: flex;
   justify-content: center;
-  align-items: center;
-  height: 100vh;
+  align-items: flex-start;
+  min-height: 100vh;
 }
 
 /* Container */
 .container {
-  max-width: 600px;
-  padding: 20px;
+  max-width: 800px;
+  padding: 30px;
   border-radius: 10px;
   background-color: #1e1e1e;
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.5);
+  margin-top: 50px;
 }
 
 /* Titel */
@@ -25,6 +26,7 @@ h1, h2 {
   color: #ffffff;
   margin-bottom: 20px;
   text-align: center;
+  font-size: 1.8rem;
 }
 
 /* Tabellen */
@@ -36,41 +38,47 @@ table {
   color: #ffffff;
   border-radius: 8px;
   overflow: hidden;
+  table-layout: fixed;
 }
 
-table, th, td {
-  border: none;
+th, td {
+  padding: 15px;
+  text-align: center;
+  font-size: 1rem;
+  word-wrap: break-word;
 }
 
 th {
   background-color: #333333;
   color: #ffffff;
   font-weight: bold;
-  padding: 10px;
 }
 
 td {
-  padding: 10px;
-  text-align: left;
+  background-color: #242424;
 }
 
 /* Formular */
 .formx {
-  margin-bottom: 20px;
+  margin-bottom: 30px;
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   gap: 10px;
+  justify-content: center;
 }
 
 .formx input, .formx button {
   padding: 10px;
   border-radius: 5px;
   border: none;
+  font-size: 1rem;
 }
 
 .formx input {
   background-color: #2a2a2a;
   color: #ffffff;
+  flex: 1;
+  min-width: 150px;
 }
 
 .formx button {
@@ -85,14 +93,53 @@ td {
   background-color: #e68900;
 }
 
-/* Responsive Anpassung */
-@media (max-width: 768px) {
-  body {
-    padding: 20px;
+/* Abstände und zentrierte Inhalte */
+form {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+}
+
+button {
+  min-width: 150px;
+}
+
+/* Responsives Design für Desktop */
+@media (min-width: 1024px) {
+  .container {
+    max-width: 800px;
+    margin-top: 100px;
   }
 
-  .container {
+  h1, h2 {
+    font-size: 2rem;
+  }
+
+  table th, table td {
+    font-size: 1.1rem;
+  }
+
+  header {
+    position: fixed;
+    top: 0;
     width: 100%;
-    padding: 15px;
+    background-color: #151515;
+    color: white;
+    text-align: center;
+    padding: 15px 0;
+    font-family: 'Brush Script MT';
+    font-size: 50px;
+    text-shadow: #FC0 1px 0 5px;
+    z-index: 1000;
+    box-shadow: 0 -6px 10px 5px rgba(0,0,0,0.5);
+  }
+  footer {
+    position: fixed;
+    bottom: 0px;
+    width: 100%;
+    text-align: center;
+    z-index: 1000;
+    font-family: 'Courier New', Courier, monospace;
   }
 }
