@@ -1,25 +1,50 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>To-Do App</title>
-  <link rel="stylesheet" href="styles.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shopping List Manager</title>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <header>
-    To-Do App
-  </header>
-  <div class="container">
-    <div class="input-group">
-      <input id="todo-input" type="text" placeholder="Insert Task here">
-      <button id="add-button">Add Task</button>
+    <div class="container">
+        <h1>Shopping List Manager</h1>
+
+        <h2>All Shopping Items</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Item Name</th>
+                    <th>Amount</th>
+                </tr>
+            </thead>
+            <tbody id="items-table-body">
+                <!-- Hier wird die Artikelliste dynamisch hinzugefügt -->
+            </tbody>
+        </table>
+
+        <h2>Add a New Item</h2>
+        <form class="formx">
+            <input id="item-name" type="text" placeholder="Name" required>
+            <input id="item-amount" type="number" placeholder="Amount" required>
+            <button type="button" id="add-item-button">Add Item</button>
+        </form>
+
+        <h2>Update Item</h2>
+        <form class="formx">
+            <input id="update-name" type="text" placeholder="Name of item to update" required>
+            <input id="update-amount" type="number" placeholder="New amount" required>
+            <button type="button" id="update-item-button">Update Item</button>
+        </form>
+
+        <h2>Delete Item</h2>
+        <form class="formx">
+            <input id="delete-name" type="text" placeholder="Name of item to delete" required>
+            <button type="button" id="delete-item-button">Delete Item</button>
+        </form>
     </div>
-    <ul id="todo-list"></ul>
-  </div>
-  <script type="application/dart" src="main.dart"></script>
-  <script src="main.dart.js"></script>
+    <script type="application/dart" src="main.dart"></script>
+    <script src="main.dart.js"></script>
 </body>
-<footer>
-  <p>&copy; Parallele und Verteilte Systeme Labor WS24/25 Marcel Hartmann & Philipp Schlosser.</p>
-</footer>
 </html>

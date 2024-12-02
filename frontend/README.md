@@ -10,6 +10,7 @@ activate and use [`package:webdev`](https://dart.dev/tools/webdev):
 
 ```
 dart pub global activate webdev
+export PATH="$PATH":"$HOME/.pub-cache/bin"
 webdev serve
 ```
 
