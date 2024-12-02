@@ -18,8 +18,8 @@ var (
 )
 
 func main() {
-	http.HandleFunc("/items", handleItems)         
-	http.HandleFunc("/items/", handleItemByName)   
+	http.HandleFunc("/items", handleItems)
+	http.HandleFunc("/items/", handleItemByName)
 	log.Println("Server läuft auf Port 8080...")
 	log.Fatal(http.ListenAndServe(":8080", nil))
 }
@@ -35,9 +35,8 @@ func handleItems(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-
 func handleItemByName(w http.ResponseWriter, r *http.Request) {
-	name := r.URL.Path[len("/items/"):] 
+	name := r.URL.Path[len("/items/"):]
 	if name == "" {
 		http.Error(w, "Item name is required", http.StatusBadRequest)
 		return
@@ -52,7 +51,6 @@ func handleItemByName(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 	}
 }
-
 
 func getItems(w http.ResponseWriter, r *http.Request) {
 	mutex.Lock()
