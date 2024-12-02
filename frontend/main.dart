@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:html';
 
 void main() {
@@ -15,50 +16,81 @@ void main() {
 
   final itemsTableBody = querySelector('#items-table-body') as TableSectionElement;
 
-  // Liste für die Speicherung der Artikel
-  final items = <Map<String, dynamic>>[];
+  // Artikel laden und Tabelle rendern
+  loadItems(itemsTableBody);
 
   // Artikel zur Liste hinzufügen
-  addItemButton.onClick.listen((_) {
+  addItemButton.onClick.listen((_) async {
     final name = itemNameInput.value!.trim();
     final amount = int.tryParse(itemAmountInput.value!.trim() ?? '');
 
     if (name.isNotEmpty && amount != null) {
-      items.add({'name': name, 'amount': amount});
-      itemNameInput.value = '';
-      itemAmountInput.value = '';
-      renderItemsTable(itemsTableBody, items);
+      try {
+        await HttpRequest.request(
+          '/items',
+          method: 'POST',
+          sendData: jsonEncode({'name': name, 'amount': amount}),
+          requestHeaders: {'Content-Type': 'application/json'},
+        );
+        itemNameInput.value = '';
+        itemAmountInput.value = '';
+        await loadItems(itemsTableBody);
+      } catch (e) {
+        window.alert('Fehler beim Hinzufügen des Artikels: $e');
+      }
     }
   });
 
   // Artikel in der Liste aktualisieren
-  updateItemButton.onClick.listen((_) {
+  updateItemButton.onClick.listen((_) async {
     final name = updateNameInput.value!.trim();
     final newAmount = int.tryParse(updateAmountInput.value!.trim() ?? '');
 
     if (name.isNotEmpty && newAmount != null) {
-      for (final item in items) {
-        if (item['name'] == name) {
-          item['amount'] = newAmount;
-          break;
-        }
+      try {
+        await HttpRequest.request(
+          '/items/$name',
+          method: 'PUT',
+          sendData: jsonEncode({'amount': newAmount}),
+          requestHeaders: {'Content-Type': 'application/json'},
+        );
+        updateNameInput.value = '';
+        updateAmountInput.value = '';
+        await loadItems(itemsTableBody);
+      } catch (e) {
+        window.alert('Fehler beim Aktualisieren des Artikels: $e');
       }
-      updateNameInput.value = '';
-      updateAmountInput.value = '';
-      renderItemsTable(itemsTableBody, items);
     }
   });
 
   // Artikel aus der Liste löschen
-  deleteItemButton.onClick.listen((_) {
+  deleteItemButton.onClick.listen((_) async {
     final name = deleteNameInput.value!.trim();
 
     if (name.isNotEmpty) {
-      items.removeWhere((item) => item['name'] == name);
-      deleteNameInput.value = '';
-      renderItemsTable(itemsTableBody, items);
+      try {
+        await HttpRequest.request(
+          '/items/$name',
+          method: 'DELETE',
+        );
+        deleteNameInput.value = '';
+        await loadItems(itemsTableBody);
+      } catch (e) {
+        window.alert('Fehler beim Löschen des Artikels: $e');
+      }
     }
   });
+}
+
+// Funktion, um Artikel vom Backend zu laden und in der Tabelle anzuzeigen
+Future<void> loadItems(TableSectionElement tableBody) async {
+  try {
+    final response = await HttpRequest.getString('/items');
+    final items = List<Map<String, dynamic>>.from(jsonDecode(response));
+    renderItemsTable(tableBody, items);
+  } catch (e) {
+    window.alert('Fehler beim Laden der Artikel: $e');
+  }
 }
 
 // Funktion, um die Artikelliste im DOM anzuzeigen
