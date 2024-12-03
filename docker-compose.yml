@@ -1,5 +1,48 @@
+version: '3.8'
+
 services:
+
+  shoppingdb:
+    container_name: shoppingdb-container
+    image: postgres
+    environment:
+      POSTGRES_USER: hse24
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: shoppingdb
+    ports:
+      - "5432:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+
   backend:
     build:
       context: ./backend
-    ports: "8080:8080"
+      dockerfile: Dockerfile
+    volumes: 
+      - ./cert.pem:/app/cert.pem
+      - ./key.pem:/app/key.pem
+    ports:
+      - "8080:8080"
+    container_name: backend-container
+    environment:
+      DB_HOST: shoppingdb-container
+      DB_PORT: 5432
+      DB_USER: hse24
+      DB_PASSWORD: password
+      DB_NAME: shoppingdb
+    depends_on:
+      - shoppingdb
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: frontend-container
+    ports:
+      - "5000:80"
+    depends_on:
+      - backend
+
+volumes:
+  db_data:
+

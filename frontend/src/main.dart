@@ -1,8 +1,13 @@
 import 'dart:convert';
 import 'dart:html';
 
+final String backendUrl = 'https://glowing-memory-q5jx4v9pqgp24wr9-8080.app.github.dev';
+
+String resolveBackendUrl(String path) {
+  return Uri.parse(backendUrl).resolve(path).toString();
+}
+
 void main() {
-  // Referenzen zu den relevanten HTML-Elementen erstellen
   final itemNameInput = querySelector('#item-name') as InputElement;
   final itemAmountInput = querySelector('#item-amount') as InputElement;
   final addItemButton = querySelector('#add-item-button') as ButtonElement;
@@ -16,10 +21,8 @@ void main() {
 
   final itemsTableBody = querySelector('#items-table-body') as TableSectionElement;
 
-  // Artikel laden und Tabelle rendern
   loadItems(itemsTableBody);
 
-  // Artikel zur Liste hinzufügen
   addItemButton.onClick.listen((_) async {
     final name = itemNameInput.value!.trim();
     final amount = int.tryParse(itemAmountInput.value!.trim() ?? '');
@@ -27,7 +30,7 @@ void main() {
     if (name.isNotEmpty && amount != null) {
       try {
         await HttpRequest.request(
-          '/items',
+          '$backendUrl/items',
           method: 'POST',
           sendData: jsonEncode({'name': name, 'amount': amount}),
           requestHeaders: {'Content-Type': 'application/json'},
@@ -41,7 +44,6 @@ void main() {
     }
   });
 
-  // Artikel in der Liste aktualisieren
   updateItemButton.onClick.listen((_) async {
     final name = updateNameInput.value!.trim();
     final newAmount = int.tryParse(updateAmountInput.value!.trim() ?? '');
@@ -49,7 +51,7 @@ void main() {
     if (name.isNotEmpty && newAmount != null) {
       try {
         await HttpRequest.request(
-          '/items/$name',
+          '$backendUrl/items/$name',
           method: 'PUT',
           sendData: jsonEncode({'amount': newAmount}),
           requestHeaders: {'Content-Type': 'application/json'},
@@ -63,14 +65,13 @@ void main() {
     }
   });
 
-  // Artikel aus der Liste löschen
   deleteItemButton.onClick.listen((_) async {
     final name = deleteNameInput.value!.trim();
 
     if (name.isNotEmpty) {
       try {
         await HttpRequest.request(
-          '/items/$name',
+          '$backendUrl/items/$name',
           method: 'DELETE',
         );
         deleteNameInput.value = '';
@@ -82,20 +83,22 @@ void main() {
   });
 }
 
-// Funktion, um Artikel vom Backend zu laden und in der Tabelle anzuzeigen
 Future<void> loadItems(TableSectionElement tableBody) async {
   try {
-    final response = await HttpRequest.getString('/items');
-    final items = List<Map<String, dynamic>>.from(jsonDecode(response));
+    final response = await HttpRequest.getString('$backendUrl/items');
+    final items = (jsonDecode(response) as List<dynamic>?)
+        ?.map((item) => item as Map<String, dynamic>)
+        .toList() ?? [];
     renderItemsTable(tableBody, items);
   } catch (e) {
     window.alert('Fehler beim Laden der Artikel: $e');
   }
 }
 
-// Funktion, um die Artikelliste im DOM anzuzeigen
+
+
 void renderItemsTable(TableSectionElement tableBody, List<Map<String, dynamic>> items) {
-  tableBody.children.clear(); // Bestehende Zeilen entfernen
+  tableBody.children.clear();
 
   for (final item in items) {
     final row = TableRowElement()
