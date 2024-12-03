@@ -1,9 +1,12 @@
-sudo apt-get update
-
-sudo apt-get install -y apt-transport-https
-wget -qO- https://dl-ssl.google.com/linux/linux_signing_key.pub | sudo gpg --dearmor -o /usr/share/keyrings/dart-archive-keyring.gpg
-echo "deb [signed-by=/usr/share/keyrings/dart-archive-keyring.gpg] https://storage.googleapis.com/download.dartlang.org/linux/debian stable main" | sudo tee /etc/apt/sources.list.d/dart_stable.list
-
-sudo apt-get install -y dart
+To start the Application please install Docker in your Codespace and use the following command:
 
 docker compose up --build
+
+It may take 2 tries, because the backend often initializes before the database.
+
+In that case use :
+
+docker compose down
+docker compose up --build
+
+In the end open the backend port 8080 to "public" in the Port Window.
