@@ -498,9 +498,9 @@
     ArrayIterator: function ArrayIterator(t0, t1, t2) {
       var _ = this;
       _._iterable = t0;
-      _._length = t1;
+      _.__interceptors$_length = t1;
       _._index = 0;
-      _._current = null;
+      _.__interceptors$_current = null;
       _.$ti = t2;
     },
     JSNumber: function JSNumber() {
@@ -514,6 +514,16 @@
   },
   A = {JS_CONST: function JS_CONST() {
     },
+    hexDigitValue(char) {
+      var letter,
+        digit = char ^ 48;
+      if (digit <= 9)
+        return digit;
+      letter = char | 32;
+      if (97 <= letter && letter <= 102)
+        return letter - 87;
+      return -1;
+    },
     checkNotNullable(value, $name, $T) {
       return value;
     },
@@ -523,6 +533,9 @@
         if (object === $.toStringVisiting[i])
           return true;
       return false;
+    },
+    IterableElementError_noElement() {
+      return new A.StateError("No element");
     },
     LateError: function LateError(t0) {
       this._message = t0;
@@ -543,6 +556,8 @@
       this._source = t0;
       this._f = t1;
       this.$ti = t2;
+    },
+    FixedLengthListMixin: function FixedLengthListMixin() {
     },
     unminifyOrTag(rawClassName) {
       var preserved = init.mangledGlobalNames[rawClassName];
@@ -588,18 +603,32 @@
       return hash;
     },
     Primitives_parseInt(source, radix) {
-      var decimalMatch,
+      var decimalMatch, maxCharCode, digitsPart, t1, i, _null = null,
         match = /^\s*[+-]?((0x[a-f0-9]+)|(\d+)|([a-z0-9]+))\s*$/i.exec(source);
       if (match == null)
-        return null;
+        return _null;
       if (3 >= match.length)
         return A.ioore(match, 3);
       decimalMatch = match[3];
-      if (decimalMatch != null)
+      if (radix == null) {
+        if (decimalMatch != null)
+          return parseInt(source, 10);
+        if (match[2] != null)
+          return parseInt(source, 16);
+        return _null;
+      }
+      if (radix < 2 || radix > 36)
+        throw A.wrapException(A.RangeError$range(radix, 2, 36, "radix", _null));
+      if (radix === 10 && decimalMatch != null)
         return parseInt(source, 10);
-      if (match[2] != null)
-        return parseInt(source, 16);
-      return null;
+      if (radix < 10 || decimalMatch == null) {
+        maxCharCode = radix <= 10 ? 47 + radix : 86 + radix;
+        digitsPart = match[1];
+        for (t1 = digitsPart.length, i = 0; i < t1; ++i)
+          if ((digitsPart.charCodeAt(i) | 32) > maxCharCode)
+            return _null;
+      }
+      return parseInt(source, radix);
     },
     Primitives_objectTypeName(object) {
       return A.Primitives__objectTypeNameNewRti(object);
@@ -631,13 +660,31 @@
         return object.toString$0(0);
       return "Instance of '" + A.Primitives_objectTypeName(object) + "'";
     },
+    Primitives_currentUri() {
+      if (!!self.location)
+        return self.location.href;
+      return null;
+    },
+    Primitives_stringFromNativeUint8List(charCodes, start, end) {
+      var i, result, i0, chunkEnd;
+      if (end <= 500 && start === 0 && end === charCodes.length)
+        return String.fromCharCode.apply(null, charCodes);
+      for (i = start, result = ""; i < end; i = i0) {
+        i0 = i + 500;
+        chunkEnd = i0 < end ? i0 : end;
+        result += String.fromCharCode.apply(null, charCodes.subarray(i, chunkEnd));
+      }
+      return result;
+    },
     Primitives_stringFromCharCode(charCode) {
       var bits;
-      if (charCode <= 65535)
-        return String.fromCharCode(charCode);
-      if (charCode <= 1114111) {
-        bits = charCode - 65536;
-        return String.fromCharCode((B.JSInt_methods._shrOtherPositive$1(bits, 10) | 55296) >>> 0, bits & 1023 | 56320);
+      if (0 <= charCode) {
+        if (charCode <= 65535)
+          return String.fromCharCode(charCode);
+        if (charCode <= 1114111) {
+          bits = charCode - 65536;
+          return String.fromCharCode((B.JSInt_methods._shrOtherPositive$1(bits, 10) | 55296) >>> 0, bits & 1023 | 56320);
+        }
       }
       throw A.wrapException(A.RangeError$range(charCode, 0, 1114111, null, null));
     },
@@ -646,6 +693,9 @@
       if (jsError == null)
         return null;
       return A.getTraceFromException(jsError);
+    },
+    iae(argument) {
+      throw A.wrapException(A.argumentErrorValue(argument));
     },
     ioore(receiver, index) {
       if (receiver == null)
@@ -660,6 +710,9 @@
       if (index < 0 || index >= $length)
         return A.IndexError$withLength(index, $length, indexable, _s5_);
       return new A.RangeError(null, null, true, index, _s5_, "Value not in range");
+    },
+    argumentErrorValue(object) {
+      return new A.ArgumentError(true, object, null, null);
     },
     wrapException(ex) {
       return A.initializeExceptionWrapper(new Error(), ex);
@@ -1259,10 +1312,40 @@
         return $function.apply(null, fieldRtis);
       return $function(fieldRtis);
     },
+    JSSyntaxRegExp_makeNative(source, multiLine, caseSensitive, unicode, dotAll, global) {
+      var m = multiLine ? "m" : "",
+        i = caseSensitive ? "" : "i",
+        u = unicode ? "u" : "",
+        s = dotAll ? "s" : "",
+        g = global ? "g" : "",
+        regexp = function(source, modifiers) {
+          try {
+            return new RegExp(source, modifiers);
+          } catch (e) {
+            return e;
+          }
+        }(source, m + i + u + s + g);
+      if (regexp instanceof RegExp)
+        return regexp;
+      throw A.wrapException(A.FormatException$("Illegal RegExp pattern (" + String(regexp) + ")", source, null));
+    },
+    stringContainsUnchecked(receiver, other, startIndex) {
+      var t1 = receiver.indexOf(other, startIndex);
+      return t1 >= 0;
+    },
     quoteStringForRegExp(string) {
       if (/[[\]{}()*+?.\\^$|]/.test(string))
         return string.replace(/[[\]{}()*+?.\\^$|]/g, "\\$&");
       return string;
+    },
+    stringReplaceFirstUnchecked(receiver, pattern, replacement, startIndex) {
+      var index = receiver.indexOf(pattern, startIndex);
+      if (index < 0)
+        return receiver;
+      return A.stringReplaceRangeUnchecked(receiver, index, index + pattern.length, replacement);
+    },
+    stringReplaceRangeUnchecked(receiver, start, end, replacement) {
+      return receiver.substring(0, start) + replacement + receiver.substring(end);
     },
     TypeErrorDecoder: function TypeErrorDecoder(t0, t1, t2, t3, t4, t5) {
       var _ = this;
@@ -1345,6 +1428,47 @@
     },
     initHooks_closure1: function initHooks_closure1(t0) {
       this.prototypeForTag = t0;
+    },
+    JSSyntaxRegExp: function JSSyntaxRegExp(t0, t1) {
+      var _ = this;
+      _.pattern = t0;
+      _._nativeRegExp = t1;
+      _._nativeAnchoredRegExp = _._nativeGlobalRegExp = null;
+    },
+    _MatchImplementation: function _MatchImplementation(t0) {
+      this._match = t0;
+    },
+    StringMatch: function StringMatch(t0, t1) {
+      this.start = t0;
+      this.pattern = t1;
+    },
+    _StringAllMatchesIterator: function _StringAllMatchesIterator(t0, t1, t2) {
+      var _ = this;
+      _._input = t0;
+      _._pattern = t1;
+      _.__js_helper$_index = t2;
+      _.__js_helper$_current = null;
+    },
+    _ensureNativeList(list) {
+      return list;
+    },
+    _checkValidIndex(index, list, $length) {
+      if (index >>> 0 !== index || index >= $length)
+        throw A.wrapException(A.diagnoseIndexError(list, index));
+    },
+    NativeTypedData: function NativeTypedData() {
+    },
+    NativeTypedArray: function NativeTypedArray() {
+    },
+    NativeTypedArrayOfInt: function NativeTypedArrayOfInt() {
+    },
+    NativeInt8List: function NativeInt8List() {
+    },
+    NativeUint8List: function NativeUint8List() {
+    },
+    _NativeTypedArrayOfInt_NativeTypedArray_ListMixin: function _NativeTypedArrayOfInt_NativeTypedArray_ListMixin() {
+    },
+    _NativeTypedArrayOfInt_NativeTypedArray_ListMixin_FixedLengthListMixin: function _NativeTypedArrayOfInt_NativeTypedArray_ListMixin_FixedLengthListMixin() {
     },
     Rti__getQuestionFromStar(universe, rti) {
       var question = rti._precomputed1;
@@ -1581,6 +1705,9 @@
       starErasedRti = A._Universe_eval(init.typeUniverse, starErasedRecipe, true);
       t1 = starErasedRti._cachedRuntimeType;
       return t1 == null ? starErasedRti._cachedRuntimeType = A._createRuntimeType(starErasedRti) : t1;
+    },
+    typeLiteral(recipe) {
+      return A.createRuntimeType(A._Universe_eval(init.typeUniverse, recipe, false));
     },
     _installSpecializedIsTest(object) {
       var t1, unstarred, unstarredKind, isFn, $name, predicate, testRti = this;
@@ -3423,8 +3550,8 @@
         parsed = JSON.parse(source);
       } catch (exception) {
         e = A.unwrapException(exception);
-        t1 = String(e);
-        throw A.wrapException(new A.FormatException(t1));
+        t1 = A.FormatException$(String(e), null, null);
+        throw A.wrapException(t1);
       }
       t1 = A._convertJsonToDartLazy(parsed);
       return t1;
@@ -3440,6 +3567,14 @@
       for (i = 0; i < object.length; ++i)
         object[i] = A._convertJsonToDartLazy(object[i]);
       return object;
+    },
+    Base64Codec__checkPadding(source, sourceIndex, sourceEnd, firstPadding, paddingCount, $length) {
+      if (B.JSInt_methods.$mod($length, 4) !== 0)
+        throw A.wrapException(A.FormatException$("Invalid base64 padding, padded length must be multiple of four, is " + $length, source, sourceEnd));
+      if (firstPadding + paddingCount !== $length)
+        throw A.wrapException(A.FormatException$("Invalid base64 padding, '=' not at the end", source, sourceIndex));
+      if (paddingCount > 2)
+        throw A.wrapException(A.FormatException$("Invalid base64 padding, more than two '=' characters", source, sourceIndex));
     },
     JsonUnsupportedObjectError$(unsupportedObject, cause, partialResult) {
       return new A.JsonUnsupportedObjectError(unsupportedObject, cause);
@@ -3465,6 +3600,10 @@
     },
     _JsonMapKeyIterable: function _JsonMapKeyIterable(t0) {
       this._parent = t0;
+    },
+    Base64Codec: function Base64Codec() {
+    },
+    Base64Encoder: function Base64Encoder() {
     },
     Codec: function Codec() {
     },
@@ -3497,6 +3636,12 @@
       this._seen = t1;
       this._toEncodable = t2;
     },
+    int_parse(source, radix) {
+      var value = A.Primitives_parseInt(source, radix);
+      if (value != null)
+        return value;
+      throw A.wrapException(A.FormatException$(source, null, null));
+    },
     Error__throw(error, stackTrace) {
       error = A.wrapException(error);
       if (error == null)
@@ -3518,11 +3663,28 @@
       return t1;
     },
     List_List$_of(elements, $E) {
-      var t1,
-        list = A._setArrayType([], $E._eval$1("JSArray<0>"));
-      for (t1 = elements.get$iterator(elements); t1.moveNext$0();)
+      var list, t1;
+      if (Array.isArray(elements))
+        return A._setArrayType(elements.slice(0), $E._eval$1("JSArray<0>"));
+      list = A._setArrayType([], $E._eval$1("JSArray<0>"));
+      for (t1 = J.get$iterator$ax(elements); t1.moveNext$0();)
         B.JSArray_methods.add$1(list, t1.get$current());
       return list;
+    },
+    String_String$fromCharCodes(charCodes) {
+      var t1;
+      A.RangeError_checkNotNegative(0, "start");
+      t1 = A.String__stringFromUint8List(charCodes, 0, null);
+      return t1;
+    },
+    String__stringFromUint8List(charCodes, start, endOrNull) {
+      var len = charCodes.length;
+      if (start >= len)
+        return "";
+      return A.Primitives_stringFromNativeUint8List(charCodes, start, len);
+    },
+    RegExp_RegExp(source) {
+      return new A.JSSyntaxRegExp(source, A.JSSyntaxRegExp_makeNative(source, false, true, false, false, false));
     },
     StringBuffer__writeAll(string, objects, separator) {
       var iterator = J.get$iterator$ax(objects);
@@ -3538,6 +3700,19 @@
           string = string + separator + A.S(iterator.get$current());
       }
       return string;
+    },
+    Uri_base() {
+      var cachedUri, uri,
+        current = A.Primitives_currentUri();
+      if (current == null)
+        throw A.wrapException(A.UnsupportedError$("'Uri.base' is not supported"));
+      cachedUri = $.Uri__cachedBaseUri;
+      if (cachedUri != null && current === $.Uri__cachedBaseString)
+        return cachedUri;
+      uri = A.Uri_parse(current);
+      $.Uri__cachedBaseUri = uri;
+      $.Uri__cachedBaseString = current;
+      return uri;
     },
     StackTrace_current() {
       return A.getTraceFromException(new Error());
@@ -3567,11 +3742,19 @@
       return new A.RangeError(minValue, maxValue, true, invalidValue, $name, "Invalid value");
     },
     RangeError_checkValidRange(start, end, $length) {
-      if (start > $length)
+      if (0 > start || start > $length)
         throw A.wrapException(A.RangeError$range(start, 0, $length, "start", null));
-      if (start > end || end > $length)
-        throw A.wrapException(A.RangeError$range(end, start, $length, "end", null));
-      return end;
+      if (end != null) {
+        if (start > end || end > $length)
+          throw A.wrapException(A.RangeError$range(end, start, $length, "end", null));
+        return end;
+      }
+      return $length;
+    },
+    RangeError_checkNotNegative(value, $name) {
+      if (value < 0)
+        throw A.wrapException(A.RangeError$range(value, 0, null, $name, null));
+      return value;
     },
     IndexError$withLength(invalidValue, $length, indexable, $name) {
       return new A.IndexError($length, true, invalidValue, $name, "Index out of range");
@@ -3587,6 +3770,9 @@
     },
     ConcurrentModificationError$(modifiedObject) {
       return new A.ConcurrentModificationError(modifiedObject);
+    },
+    FormatException$(message, source, offset) {
+      return new A.FormatException(message, source, offset);
     },
     Iterable_iterableToShortString(iterable, leftDelimiter, rightDelimiter) {
       var parts, t1;
@@ -3706,6 +3892,1044 @@
       B.JSArray_methods.add$1(parts, penultimateString);
       B.JSArray_methods.add$1(parts, ultimateString);
     },
+    Uri_parse(uri) {
+      var delta, indices, schemeEnd, hostStart, portStart, pathStart, queryStart, fragmentStart, isSimple, scheme, t1, t2, schemeAuth, queryStart0, pathStart0, port, userInfoStart, userInfo, host, portNumber, path, query, _null = null,
+        end = uri.length;
+      if (end >= 5) {
+        if (4 >= end)
+          return A.ioore(uri, 4);
+        delta = ((uri.charCodeAt(4) ^ 58) * 3 | uri.charCodeAt(0) ^ 100 | uri.charCodeAt(1) ^ 97 | uri.charCodeAt(2) ^ 116 | uri.charCodeAt(3) ^ 97) >>> 0;
+        if (delta === 0)
+          return A.UriData__parse(end < end ? B.JSString_methods.substring$2(uri, 0, end) : uri, 5, _null).get$uri();
+        else if (delta === 32)
+          return A.UriData__parse(B.JSString_methods.substring$2(uri, 5, end), 0, _null).get$uri();
+      }
+      indices = A.List_List$filled(8, 0, false, type$.int);
+      B.JSArray_methods.$indexSet(indices, 0, 0);
+      B.JSArray_methods.$indexSet(indices, 1, -1);
+      B.JSArray_methods.$indexSet(indices, 2, -1);
+      B.JSArray_methods.$indexSet(indices, 7, -1);
+      B.JSArray_methods.$indexSet(indices, 3, 0);
+      B.JSArray_methods.$indexSet(indices, 4, 0);
+      B.JSArray_methods.$indexSet(indices, 5, end);
+      B.JSArray_methods.$indexSet(indices, 6, end);
+      if (A._scan(uri, 0, end, 0, indices) >= 14)
+        B.JSArray_methods.$indexSet(indices, 7, end);
+      schemeEnd = indices[1];
+      if (schemeEnd >= 0)
+        if (A._scan(uri, 0, schemeEnd, 20, indices) === 20)
+          indices[7] = schemeEnd;
+      hostStart = indices[2] + 1;
+      portStart = indices[3];
+      pathStart = indices[4];
+      queryStart = indices[5];
+      fragmentStart = indices[6];
+      if (fragmentStart < queryStart)
+        queryStart = fragmentStart;
+      if (pathStart < hostStart)
+        pathStart = queryStart;
+      else if (pathStart <= schemeEnd)
+        pathStart = schemeEnd + 1;
+      if (portStart < hostStart)
+        portStart = pathStart;
+      isSimple = indices[7] < 0;
+      scheme = _null;
+      if (isSimple) {
+        isSimple = false;
+        if (!(hostStart > schemeEnd + 3)) {
+          t1 = portStart > 0;
+          if (!(t1 && portStart + 1 === pathStart)) {
+            if (!B.JSString_methods.startsWith$2(uri, "\\", pathStart))
+              if (hostStart > 0)
+                t2 = B.JSString_methods.startsWith$2(uri, "\\", hostStart - 1) || B.JSString_methods.startsWith$2(uri, "\\", hostStart - 2);
+              else
+                t2 = false;
+            else
+              t2 = true;
+            if (!t2) {
+              if (!(queryStart < end && queryStart === pathStart + 2 && B.JSString_methods.startsWith$2(uri, "..", pathStart)))
+                t2 = queryStart > pathStart + 2 && B.JSString_methods.startsWith$2(uri, "/..", queryStart - 3);
+              else
+                t2 = true;
+              if (!t2)
+                if (schemeEnd === 4) {
+                  if (B.JSString_methods.startsWith$2(uri, "file", 0)) {
+                    if (hostStart <= 0) {
+                      if (!B.JSString_methods.startsWith$2(uri, "/", pathStart)) {
+                        schemeAuth = "file:///";
+                        delta = 3;
+                      } else {
+                        schemeAuth = "file://";
+                        delta = 2;
+                      }
+                      uri = schemeAuth + B.JSString_methods.substring$2(uri, pathStart, end);
+                      queryStart += delta;
+                      fragmentStart += delta;
+                      end = uri.length;
+                      hostStart = 7;
+                      portStart = 7;
+                      pathStart = 7;
+                    } else if (pathStart === queryStart) {
+                      ++fragmentStart;
+                      queryStart0 = queryStart + 1;
+                      uri = B.JSString_methods.replaceRange$3(uri, pathStart, queryStart, "/");
+                      ++end;
+                      queryStart = queryStart0;
+                    }
+                    scheme = "file";
+                  } else if (B.JSString_methods.startsWith$2(uri, "http", 0)) {
+                    if (t1 && portStart + 3 === pathStart && B.JSString_methods.startsWith$2(uri, "80", portStart + 1)) {
+                      fragmentStart -= 3;
+                      pathStart0 = pathStart - 3;
+                      queryStart -= 3;
+                      uri = B.JSString_methods.replaceRange$3(uri, portStart, pathStart, "");
+                      end -= 3;
+                      pathStart = pathStart0;
+                    }
+                    scheme = "http";
+                  }
+                } else if (schemeEnd === 5 && B.JSString_methods.startsWith$2(uri, "https", 0)) {
+                  if (t1 && portStart + 4 === pathStart && B.JSString_methods.startsWith$2(uri, "443", portStart + 1)) {
+                    fragmentStart -= 4;
+                    pathStart0 = pathStart - 4;
+                    queryStart -= 4;
+                    uri = B.JSString_methods.replaceRange$3(uri, portStart, pathStart, "");
+                    end -= 3;
+                    pathStart = pathStart0;
+                  }
+                  scheme = "https";
+                }
+              isSimple = !t2;
+            }
+          }
+        }
+      }
+      if (isSimple)
+        return new A._SimpleUri(end < uri.length ? B.JSString_methods.substring$2(uri, 0, end) : uri, schemeEnd, hostStart, portStart, pathStart, queryStart, fragmentStart, scheme);
+      if (scheme == null)
+        if (schemeEnd > 0)
+          scheme = A._Uri__makeScheme(uri, 0, schemeEnd);
+        else {
+          if (schemeEnd === 0)
+            A._Uri__fail(uri, 0, "Invalid empty scheme");
+          scheme = "";
+        }
+      port = _null;
+      if (hostStart > 0) {
+        userInfoStart = schemeEnd + 3;
+        userInfo = userInfoStart < hostStart ? A._Uri__makeUserInfo(uri, userInfoStart, hostStart - 1) : "";
+        host = A._Uri__makeHost(uri, hostStart, portStart, false);
+        t1 = portStart + 1;
+        if (t1 < pathStart) {
+          portNumber = A.Primitives_parseInt(B.JSString_methods.substring$2(uri, t1, pathStart), _null);
+          port = A._Uri__makePort(portNumber == null ? A.throwExpression(A.FormatException$("Invalid port", uri, t1)) : portNumber, scheme);
+        }
+      } else {
+        host = _null;
+        userInfo = "";
+      }
+      path = A._Uri__makePath(uri, pathStart, queryStart, _null, scheme, host != null);
+      query = queryStart < fragmentStart ? A._Uri__makeQuery(uri, queryStart + 1, fragmentStart, _null) : _null;
+      return A._Uri$_internal(scheme, userInfo, host, port, path, query, fragmentStart < end ? A._Uri__makeFragment(uri, fragmentStart + 1, end) : _null);
+    },
+    Uri__parseIPv4Address(host, start, end) {
+      var t1, i, partStart, partIndex, char, part, partIndex0,
+        _s43_ = "IPv4 address should contain exactly 4 parts",
+        _s37_ = "each part must be in the range 0..255",
+        error = new A.Uri__parseIPv4Address_error(host),
+        result = new Uint8Array(4);
+      for (t1 = host.length, i = start, partStart = i, partIndex = 0; i < end; ++i) {
+        if (!(i >= 0 && i < t1))
+          return A.ioore(host, i);
+        char = host.charCodeAt(i);
+        if (char !== 46) {
+          if ((char ^ 48) > 9)
+            error.call$2("invalid character", i);
+        } else {
+          if (partIndex === 3)
+            error.call$2(_s43_, i);
+          part = A.int_parse(B.JSString_methods.substring$2(host, partStart, i), null);
+          if (part > 255)
+            error.call$2(_s37_, partStart);
+          partIndex0 = partIndex + 1;
+          if (!(partIndex < 4))
+            return A.ioore(result, partIndex);
+          result[partIndex] = part;
+          partStart = i + 1;
+          partIndex = partIndex0;
+        }
+      }
+      if (partIndex !== 3)
+        error.call$2(_s43_, end);
+      part = A.int_parse(B.JSString_methods.substring$2(host, partStart, end), null);
+      if (part > 255)
+        error.call$2(_s37_, partStart);
+      if (!(partIndex < 4))
+        return A.ioore(result, partIndex);
+      result[partIndex] = part;
+      return result;
+    },
+    Uri_parseIPv6Address(host, start, end) {
+      var parts, i, partStart, wildcardSeen, seenDot, char, atEnd, last, bytes, wildCardLength, index, value, j, t2, _null = null,
+        error = new A.Uri_parseIPv6Address_error(host),
+        parseHex = new A.Uri_parseIPv6Address_parseHex(error, host),
+        t1 = host.length;
+      if (t1 < 2)
+        error.call$2("address is too short", _null);
+      parts = A._setArrayType([], type$.JSArray_int);
+      for (i = start, partStart = i, wildcardSeen = false, seenDot = false; i < end; ++i) {
+        if (!(i >= 0 && i < t1))
+          return A.ioore(host, i);
+        char = host.charCodeAt(i);
+        if (char === 58) {
+          if (i === start) {
+            ++i;
+            if (!(i < t1))
+              return A.ioore(host, i);
+            if (host.charCodeAt(i) !== 58)
+              error.call$2("invalid start colon.", i);
+            partStart = i;
+          }
+          if (i === partStart) {
+            if (wildcardSeen)
+              error.call$2("only one wildcard `::` is allowed", i);
+            B.JSArray_methods.add$1(parts, -1);
+            wildcardSeen = true;
+          } else
+            B.JSArray_methods.add$1(parts, parseHex.call$2(partStart, i));
+          partStart = i + 1;
+        } else if (char === 46)
+          seenDot = true;
+      }
+      if (parts.length === 0)
+        error.call$2("too few parts", _null);
+      atEnd = partStart === end;
+      t1 = B.JSArray_methods.get$last(parts);
+      if (atEnd && t1 !== -1)
+        error.call$2("expected a part after last `:`", end);
+      if (!atEnd)
+        if (!seenDot)
+          B.JSArray_methods.add$1(parts, parseHex.call$2(partStart, end));
+        else {
+          last = A.Uri__parseIPv4Address(host, partStart, end);
+          B.JSArray_methods.add$1(parts, (last[0] << 8 | last[1]) >>> 0);
+          B.JSArray_methods.add$1(parts, (last[2] << 8 | last[3]) >>> 0);
+        }
+      if (wildcardSeen) {
+        if (parts.length > 7)
+          error.call$2("an address with a wildcard must have less than 7 parts", _null);
+      } else if (parts.length !== 8)
+        error.call$2("an address without a wildcard must contain exactly 8 parts", _null);
+      bytes = new Uint8Array(16);
+      for (t1 = parts.length, wildCardLength = 9 - t1, i = 0, index = 0; i < t1; ++i) {
+        value = parts[i];
+        if (value === -1)
+          for (j = 0; j < wildCardLength; ++j) {
+            if (!(index >= 0 && index < 16))
+              return A.ioore(bytes, index);
+            bytes[index] = 0;
+            t2 = index + 1;
+            if (!(t2 < 16))
+              return A.ioore(bytes, t2);
+            bytes[t2] = 0;
+            index += 2;
+          }
+        else {
+          t2 = B.JSInt_methods._shrOtherPositive$1(value, 8);
+          if (!(index >= 0 && index < 16))
+            return A.ioore(bytes, index);
+          bytes[index] = t2;
+          t2 = index + 1;
+          if (!(t2 < 16))
+            return A.ioore(bytes, t2);
+          bytes[t2] = value & 255;
+          index += 2;
+        }
+      }
+      return bytes;
+    },
+    _Uri$_internal(scheme, _userInfo, _host, _port, path, _query, _fragment) {
+      return new A._Uri(scheme, _userInfo, _host, _port, path, _query, _fragment);
+    },
+    _Uri__defaultPort(scheme) {
+      if (scheme === "http")
+        return 80;
+      if (scheme === "https")
+        return 443;
+      return 0;
+    },
+    _Uri__fail(uri, index, message) {
+      throw A.wrapException(A.FormatException$(message, uri, index));
+    },
+    _Uri__makePort(port, scheme) {
+      if (port != null && port === A._Uri__defaultPort(scheme))
+        return null;
+      return port;
+    },
+    _Uri__makeHost(host, start, end, strictIPv6) {
+      var t1, t2, index, zoneIDstart, zoneID, i;
+      if (start === end)
+        return "";
+      t1 = host.length;
+      if (!(start >= 0 && start < t1))
+        return A.ioore(host, start);
+      if (host.charCodeAt(start) === 91) {
+        t2 = end - 1;
+        if (!(t2 >= 0 && t2 < t1))
+          return A.ioore(host, t2);
+        if (host.charCodeAt(t2) !== 93)
+          A._Uri__fail(host, start, "Missing end `]` to match `[` in host");
+        t1 = start + 1;
+        index = A._Uri__checkZoneID(host, t1, t2);
+        if (index < t2) {
+          zoneIDstart = index + 1;
+          zoneID = A._Uri__normalizeZoneID(host, B.JSString_methods.startsWith$2(host, "25", zoneIDstart) ? index + 3 : zoneIDstart, t2, "%25");
+        } else
+          zoneID = "";
+        A.Uri_parseIPv6Address(host, t1, index);
+        return B.JSString_methods.substring$2(host, start, index).toLowerCase() + zoneID + "]";
+      }
+      for (i = start; i < end; ++i) {
+        if (!(i < t1))
+          return A.ioore(host, i);
+        if (host.charCodeAt(i) === 58) {
+          index = B.JSString_methods.indexOf$2(host, "%", start);
+          index = index >= start && index < end ? index : end;
+          if (index < end) {
+            zoneIDstart = index + 1;
+            zoneID = A._Uri__normalizeZoneID(host, B.JSString_methods.startsWith$2(host, "25", zoneIDstart) ? index + 3 : zoneIDstart, end, "%25");
+          } else
+            zoneID = "";
+          A.Uri_parseIPv6Address(host, start, index);
+          return "[" + B.JSString_methods.substring$2(host, start, index) + zoneID + "]";
+        }
+      }
+      return A._Uri__normalizeRegName(host, start, end);
+    },
+    _Uri__checkZoneID(host, start, end) {
+      var index = B.JSString_methods.indexOf$2(host, "%", start);
+      return index >= start && index < end ? index : end;
+    },
+    _Uri__normalizeZoneID(host, start, end, prefix) {
+      var t1, index, sectionStart, isNormalized, char, replacement, t2, t3, sourceLength, tail, slice,
+        buffer = prefix !== "" ? new A.StringBuffer(prefix) : null;
+      for (t1 = host.length, index = start, sectionStart = index, isNormalized = true; index < end;) {
+        if (!(index >= 0 && index < t1))
+          return A.ioore(host, index);
+        char = host.charCodeAt(index);
+        if (char === 37) {
+          replacement = A._Uri__normalizeEscape(host, index, true);
+          t2 = replacement == null;
+          if (t2 && isNormalized) {
+            index += 3;
+            continue;
+          }
+          if (buffer == null)
+            buffer = new A.StringBuffer("");
+          t3 = buffer._contents += B.JSString_methods.substring$2(host, sectionStart, index);
+          if (t2)
+            replacement = B.JSString_methods.substring$2(host, index, index + 3);
+          else if (replacement === "%")
+            A._Uri__fail(host, index, "ZoneID should not contain % anymore");
+          buffer._contents = t3 + replacement;
+          index += 3;
+          sectionStart = index;
+          isNormalized = true;
+        } else {
+          if (char < 127) {
+            t2 = char >>> 4;
+            if (!(t2 < 8))
+              return A.ioore(B.List_piR, t2);
+            t2 = (B.List_piR[t2] & 1 << (char & 15)) !== 0;
+          } else
+            t2 = false;
+          if (t2) {
+            if (isNormalized && 65 <= char && 90 >= char) {
+              if (buffer == null)
+                buffer = new A.StringBuffer("");
+              if (sectionStart < index) {
+                buffer._contents += B.JSString_methods.substring$2(host, sectionStart, index);
+                sectionStart = index;
+              }
+              isNormalized = false;
+            }
+            ++index;
+          } else {
+            sourceLength = 1;
+            if ((char & 64512) === 55296 && index + 1 < end) {
+              t2 = index + 1;
+              if (!(t2 < t1))
+                return A.ioore(host, t2);
+              tail = host.charCodeAt(t2);
+              if ((tail & 64512) === 56320) {
+                char = (char & 1023) << 10 | tail & 1023 | 65536;
+                sourceLength = 2;
+              }
+            }
+            slice = B.JSString_methods.substring$2(host, sectionStart, index);
+            if (buffer == null) {
+              buffer = new A.StringBuffer("");
+              t2 = buffer;
+            } else
+              t2 = buffer;
+            t2._contents += slice;
+            t3 = A._Uri__escapeChar(char);
+            t2._contents += t3;
+            index += sourceLength;
+            sectionStart = index;
+          }
+        }
+      }
+      if (buffer == null)
+        return B.JSString_methods.substring$2(host, start, end);
+      if (sectionStart < end) {
+        slice = B.JSString_methods.substring$2(host, sectionStart, end);
+        buffer._contents += slice;
+      }
+      t1 = buffer._contents;
+      return t1.charCodeAt(0) == 0 ? t1 : t1;
+    },
+    _Uri__normalizeRegName(host, start, end) {
+      var t1, index, sectionStart, buffer, isNormalized, char, replacement, t2, slice, t3, sourceLength, tail;
+      for (t1 = host.length, index = start, sectionStart = index, buffer = null, isNormalized = true; index < end;) {
+        if (!(index >= 0 && index < t1))
+          return A.ioore(host, index);
+        char = host.charCodeAt(index);
+        if (char === 37) {
+          replacement = A._Uri__normalizeEscape(host, index, true);
+          t2 = replacement == null;
+          if (t2 && isNormalized) {
+            index += 3;
+            continue;
+          }
+          if (buffer == null)
+            buffer = new A.StringBuffer("");
+          slice = B.JSString_methods.substring$2(host, sectionStart, index);
+          if (!isNormalized)
+            slice = slice.toLowerCase();
+          t3 = buffer._contents += slice;
+          sourceLength = 3;
+          if (t2)
+            replacement = B.JSString_methods.substring$2(host, index, index + 3);
+          else if (replacement === "%") {
+            replacement = "%25";
+            sourceLength = 1;
+          }
+          buffer._contents = t3 + replacement;
+          index += sourceLength;
+          sectionStart = index;
+          isNormalized = true;
+        } else {
+          if (char < 127) {
+            t2 = char >>> 4;
+            if (!(t2 < 8))
+              return A.ioore(B.List_4AN, t2);
+            t2 = (B.List_4AN[t2] & 1 << (char & 15)) !== 0;
+          } else
+            t2 = false;
+          if (t2) {
+            if (isNormalized && 65 <= char && 90 >= char) {
+              if (buffer == null)
+                buffer = new A.StringBuffer("");
+              if (sectionStart < index) {
+                buffer._contents += B.JSString_methods.substring$2(host, sectionStart, index);
+                sectionStart = index;
+              }
+              isNormalized = false;
+            }
+            ++index;
+          } else {
+            if (char <= 93) {
+              t2 = char >>> 4;
+              if (!(t2 < 8))
+                return A.ioore(B.List_VOY, t2);
+              t2 = (B.List_VOY[t2] & 1 << (char & 15)) !== 0;
+            } else
+              t2 = false;
+            if (t2)
+              A._Uri__fail(host, index, "Invalid character");
+            else {
+              sourceLength = 1;
+              if ((char & 64512) === 55296 && index + 1 < end) {
+                t2 = index + 1;
+                if (!(t2 < t1))
+                  return A.ioore(host, t2);
+                tail = host.charCodeAt(t2);
+                if ((tail & 64512) === 56320) {
+                  char = (char & 1023) << 10 | tail & 1023 | 65536;
+                  sourceLength = 2;
+                }
+              }
+              slice = B.JSString_methods.substring$2(host, sectionStart, index);
+              if (!isNormalized)
+                slice = slice.toLowerCase();
+              if (buffer == null) {
+                buffer = new A.StringBuffer("");
+                t2 = buffer;
+              } else
+                t2 = buffer;
+              t2._contents += slice;
+              t3 = A._Uri__escapeChar(char);
+              t2._contents += t3;
+              index += sourceLength;
+              sectionStart = index;
+            }
+          }
+        }
+      }
+      if (buffer == null)
+        return B.JSString_methods.substring$2(host, start, end);
+      if (sectionStart < end) {
+        slice = B.JSString_methods.substring$2(host, sectionStart, end);
+        if (!isNormalized)
+          slice = slice.toLowerCase();
+        buffer._contents += slice;
+      }
+      t1 = buffer._contents;
+      return t1.charCodeAt(0) == 0 ? t1 : t1;
+    },
+    _Uri__makeScheme(scheme, start, end) {
+      var t1, i, containsUpperCase, codeUnit, t2;
+      if (start === end)
+        return "";
+      t1 = scheme.length;
+      if (!(start < t1))
+        return A.ioore(scheme, start);
+      if (!A._Uri__isAlphabeticCharacter(scheme.charCodeAt(start)))
+        A._Uri__fail(scheme, start, "Scheme not starting with alphabetic character");
+      for (i = start, containsUpperCase = false; i < end; ++i) {
+        if (!(i < t1))
+          return A.ioore(scheme, i);
+        codeUnit = scheme.charCodeAt(i);
+        if (codeUnit < 128) {
+          t2 = codeUnit >>> 4;
+          if (!(t2 < 8))
+            return A.ioore(B.List_GVy, t2);
+          t2 = (B.List_GVy[t2] & 1 << (codeUnit & 15)) !== 0;
+        } else
+          t2 = false;
+        if (!t2)
+          A._Uri__fail(scheme, i, "Illegal scheme character");
+        if (65 <= codeUnit && codeUnit <= 90)
+          containsUpperCase = true;
+      }
+      scheme = B.JSString_methods.substring$2(scheme, start, end);
+      return A._Uri__canonicalizeScheme(containsUpperCase ? scheme.toLowerCase() : scheme);
+    },
+    _Uri__canonicalizeScheme(scheme) {
+      if (scheme === "http")
+        return "http";
+      if (scheme === "file")
+        return "file";
+      if (scheme === "https")
+        return "https";
+      if (scheme === "package")
+        return "package";
+      return scheme;
+    },
+    _Uri__makeUserInfo(userInfo, start, end) {
+      return A._Uri__normalizeOrSubstring(userInfo, start, end, B.List_2jN, false, false);
+    },
+    _Uri__makePath(path, start, end, pathSegments, scheme, hasAuthority) {
+      var result,
+        isFile = scheme === "file",
+        ensureLeadingSlash = isFile || hasAuthority;
+      if (path == null)
+        return isFile ? "/" : "";
+      else
+        result = A._Uri__normalizeOrSubstring(path, start, end, B.List_M2I, true, true);
+      if (result.length === 0) {
+        if (isFile)
+          return "/";
+      } else if (ensureLeadingSlash && !B.JSString_methods.startsWith$1(result, "/"))
+        result = "/" + result;
+      return A._Uri__normalizePath(result, scheme, hasAuthority);
+    },
+    _Uri__normalizePath(path, scheme, hasAuthority) {
+      var t1 = scheme.length === 0;
+      if (t1 && !hasAuthority && !B.JSString_methods.startsWith$1(path, "/") && !B.JSString_methods.startsWith$1(path, "\\"))
+        return A._Uri__normalizeRelativePath(path, !t1 || hasAuthority);
+      return A._Uri__removeDotSegments(path);
+    },
+    _Uri__makeQuery(query, start, end, queryParameters) {
+      if (query != null)
+        return A._Uri__normalizeOrSubstring(query, start, end, B.List_42A, true, false);
+      return null;
+    },
+    _Uri__makeFragment(fragment, start, end) {
+      return A._Uri__normalizeOrSubstring(fragment, start, end, B.List_42A, true, false);
+    },
+    _Uri__normalizeEscape(source, index, lowerCase) {
+      var t3, firstDigit, secondDigit, firstDigitValue, secondDigitValue, value,
+        t1 = index + 2,
+        t2 = source.length;
+      if (t1 >= t2)
+        return "%";
+      t3 = index + 1;
+      if (!(t3 >= 0 && t3 < t2))
+        return A.ioore(source, t3);
+      firstDigit = source.charCodeAt(t3);
+      if (!(t1 >= 0))
+        return A.ioore(source, t1);
+      secondDigit = source.charCodeAt(t1);
+      firstDigitValue = A.hexDigitValue(firstDigit);
+      secondDigitValue = A.hexDigitValue(secondDigit);
+      if (firstDigitValue < 0 || secondDigitValue < 0)
+        return "%";
+      value = firstDigitValue * 16 + secondDigitValue;
+      if (value < 127) {
+        t1 = B.JSInt_methods._shrOtherPositive$1(value, 4);
+        if (!(t1 < 8))
+          return A.ioore(B.List_piR, t1);
+        t1 = (B.List_piR[t1] & 1 << (value & 15)) !== 0;
+      } else
+        t1 = false;
+      if (t1)
+        return A.Primitives_stringFromCharCode(lowerCase && 65 <= value && 90 >= value ? (value | 32) >>> 0 : value);
+      if (firstDigit >= 97 || secondDigit >= 97)
+        return B.JSString_methods.substring$2(source, index, index + 3).toUpperCase();
+      return null;
+    },
+    _Uri__escapeChar(char) {
+      var codeUnits, t1, flag, encodedBytes, index, byte, t2, t3,
+        _s16_ = "0123456789ABCDEF";
+      if (char < 128) {
+        codeUnits = new Uint8Array(3);
+        codeUnits[0] = 37;
+        t1 = char >>> 4;
+        if (!(t1 < 16))
+          return A.ioore(_s16_, t1);
+        codeUnits[1] = _s16_.charCodeAt(t1);
+        codeUnits[2] = _s16_.charCodeAt(char & 15);
+      } else {
+        if (char > 2047)
+          if (char > 65535) {
+            flag = 240;
+            encodedBytes = 4;
+          } else {
+            flag = 224;
+            encodedBytes = 3;
+          }
+        else {
+          flag = 192;
+          encodedBytes = 2;
+        }
+        t1 = 3 * encodedBytes;
+        codeUnits = new Uint8Array(t1);
+        for (index = 0; --encodedBytes, encodedBytes >= 0; flag = 128) {
+          byte = B.JSInt_methods._shrReceiverPositive$1(char, 6 * encodedBytes) & 63 | flag;
+          if (!(index < t1))
+            return A.ioore(codeUnits, index);
+          codeUnits[index] = 37;
+          t2 = index + 1;
+          t3 = byte >>> 4;
+          if (!(t3 < 16))
+            return A.ioore(_s16_, t3);
+          if (!(t2 < t1))
+            return A.ioore(codeUnits, t2);
+          codeUnits[t2] = _s16_.charCodeAt(t3);
+          t3 = index + 2;
+          if (!(t3 < t1))
+            return A.ioore(codeUnits, t3);
+          codeUnits[t3] = _s16_.charCodeAt(byte & 15);
+          index += 3;
+        }
+      }
+      return A.String_String$fromCharCodes(codeUnits);
+    },
+    _Uri__normalizeOrSubstring(component, start, end, charTable, escapeDelimiters, replaceBackslash) {
+      var t1 = A._Uri__normalize(component, start, end, charTable, escapeDelimiters, replaceBackslash);
+      return t1 == null ? B.JSString_methods.substring$2(component, start, end) : t1;
+    },
+    _Uri__normalize(component, start, end, charTable, escapeDelimiters, replaceBackslash) {
+      var t1, t2, index, sectionStart, buffer, char, t3, sourceLength, replacement, tail, t4, _null = null;
+      for (t1 = !escapeDelimiters, t2 = component.length, index = start, sectionStart = index, buffer = _null; index < end;) {
+        if (!(index >= 0 && index < t2))
+          return A.ioore(component, index);
+        char = component.charCodeAt(index);
+        if (char < 127) {
+          t3 = char >>> 4;
+          if (!(t3 < 8))
+            return A.ioore(charTable, t3);
+          t3 = (charTable[t3] & 1 << (char & 15)) !== 0;
+        } else
+          t3 = false;
+        if (t3)
+          ++index;
+        else {
+          sourceLength = 1;
+          if (char === 37) {
+            replacement = A._Uri__normalizeEscape(component, index, false);
+            if (replacement == null) {
+              index += 3;
+              continue;
+            }
+            if ("%" === replacement)
+              replacement = "%25";
+            else
+              sourceLength = 3;
+          } else if (char === 92 && replaceBackslash)
+            replacement = "/";
+          else {
+            t3 = false;
+            if (t1)
+              if (char <= 93) {
+                t3 = char >>> 4;
+                if (!(t3 < 8))
+                  return A.ioore(B.List_VOY, t3);
+                t3 = (B.List_VOY[t3] & 1 << (char & 15)) !== 0;
+              }
+            if (t3) {
+              A._Uri__fail(component, index, "Invalid character");
+              sourceLength = _null;
+              replacement = sourceLength;
+            } else {
+              if ((char & 64512) === 55296) {
+                t3 = index + 1;
+                if (t3 < end) {
+                  if (!(t3 < t2))
+                    return A.ioore(component, t3);
+                  tail = component.charCodeAt(t3);
+                  if ((tail & 64512) === 56320) {
+                    char = (char & 1023) << 10 | tail & 1023 | 65536;
+                    sourceLength = 2;
+                  }
+                }
+              }
+              replacement = A._Uri__escapeChar(char);
+            }
+          }
+          if (buffer == null) {
+            buffer = new A.StringBuffer("");
+            t3 = buffer;
+          } else
+            t3 = buffer;
+          t4 = t3._contents += B.JSString_methods.substring$2(component, sectionStart, index);
+          t3._contents = t4 + A.S(replacement);
+          if (typeof sourceLength !== "number")
+            return A.iae(sourceLength);
+          index += sourceLength;
+          sectionStart = index;
+        }
+      }
+      if (buffer == null)
+        return _null;
+      if (sectionStart < end) {
+        t1 = B.JSString_methods.substring$2(component, sectionStart, end);
+        buffer._contents += t1;
+      }
+      t1 = buffer._contents;
+      return t1.charCodeAt(0) == 0 ? t1 : t1;
+    },
+    _Uri__mayContainDotSegments(path) {
+      if (B.JSString_methods.startsWith$1(path, "."))
+        return true;
+      return B.JSString_methods.indexOf$1(path, "/.") !== -1;
+    },
+    _Uri__removeDotSegments(path) {
+      var output, t1, t2, appendSlash, _i, segment, t3;
+      if (!A._Uri__mayContainDotSegments(path))
+        return path;
+      output = A._setArrayType([], type$.JSArray_String);
+      for (t1 = path.split("/"), t2 = t1.length, appendSlash = false, _i = 0; _i < t2; ++_i) {
+        segment = t1[_i];
+        if (J.$eq$(segment, "..")) {
+          t3 = output.length;
+          if (t3 !== 0) {
+            if (0 >= t3)
+              return A.ioore(output, -1);
+            output.pop();
+            if (output.length === 0)
+              B.JSArray_methods.add$1(output, "");
+          }
+          appendSlash = true;
+        } else {
+          appendSlash = "." === segment;
+          if (!appendSlash)
+            B.JSArray_methods.add$1(output, segment);
+        }
+      }
+      if (appendSlash)
+        B.JSArray_methods.add$1(output, "");
+      return B.JSArray_methods.join$1(output, "/");
+    },
+    _Uri__normalizeRelativePath(path, allowScheme) {
+      var output, t1, t2, appendSlash, _i, segment;
+      if (!A._Uri__mayContainDotSegments(path))
+        return !allowScheme ? A._Uri__escapeScheme(path) : path;
+      output = A._setArrayType([], type$.JSArray_String);
+      for (t1 = path.split("/"), t2 = t1.length, appendSlash = false, _i = 0; _i < t2; ++_i) {
+        segment = t1[_i];
+        if (".." === segment) {
+          appendSlash = output.length !== 0 && B.JSArray_methods.get$last(output) !== "..";
+          if (appendSlash) {
+            if (0 >= output.length)
+              return A.ioore(output, -1);
+            output.pop();
+          } else
+            B.JSArray_methods.add$1(output, "..");
+        } else {
+          appendSlash = "." === segment;
+          if (!appendSlash)
+            B.JSArray_methods.add$1(output, segment);
+        }
+      }
+      t1 = output.length;
+      if (t1 !== 0)
+        if (t1 === 1) {
+          if (0 >= t1)
+            return A.ioore(output, 0);
+          t1 = output[0].length === 0;
+        } else
+          t1 = false;
+      else
+        t1 = true;
+      if (t1)
+        return "./";
+      if (appendSlash || B.JSArray_methods.get$last(output) === "..")
+        B.JSArray_methods.add$1(output, "");
+      if (!allowScheme) {
+        if (0 >= output.length)
+          return A.ioore(output, 0);
+        B.JSArray_methods.$indexSet(output, 0, A._Uri__escapeScheme(output[0]));
+      }
+      return B.JSArray_methods.join$1(output, "/");
+    },
+    _Uri__escapeScheme(path) {
+      var i, char, t2,
+        t1 = path.length;
+      if (t1 >= 2 && A._Uri__isAlphabeticCharacter(path.charCodeAt(0)))
+        for (i = 1; i < t1; ++i) {
+          char = path.charCodeAt(i);
+          if (char === 58)
+            return B.JSString_methods.substring$2(path, 0, i) + "%3A" + B.JSString_methods.substring$1(path, i + 1);
+          if (char <= 127) {
+            t2 = char >>> 4;
+            if (!(t2 < 8))
+              return A.ioore(B.List_GVy, t2);
+            t2 = (B.List_GVy[t2] & 1 << (char & 15)) === 0;
+          } else
+            t2 = true;
+          if (t2)
+            break;
+        }
+      return path;
+    },
+    _Uri__isAlphabeticCharacter(codeUnit) {
+      var lowerCase = codeUnit | 32;
+      return 97 <= lowerCase && lowerCase <= 122;
+    },
+    UriData__parse(text, start, sourceUri) {
+      var t1, i, slashIndex, char, equalsIndex, lastSeparator, t2, data,
+        _s17_ = "Invalid MIME type",
+        indices = A._setArrayType([start - 1], type$.JSArray_int);
+      for (t1 = text.length, i = start, slashIndex = -1, char = null; i < t1; ++i) {
+        char = text.charCodeAt(i);
+        if (char === 44 || char === 59)
+          break;
+        if (char === 47) {
+          if (slashIndex < 0) {
+            slashIndex = i;
+            continue;
+          }
+          throw A.wrapException(A.FormatException$(_s17_, text, i));
+        }
+      }
+      if (slashIndex < 0 && i > start)
+        throw A.wrapException(A.FormatException$(_s17_, text, i));
+      for (; char !== 44;) {
+        B.JSArray_methods.add$1(indices, i);
+        ++i;
+        for (equalsIndex = -1; i < t1; ++i) {
+          if (!(i >= 0))
+            return A.ioore(text, i);
+          char = text.charCodeAt(i);
+          if (char === 61) {
+            if (equalsIndex < 0)
+              equalsIndex = i;
+          } else if (char === 59 || char === 44)
+            break;
+        }
+        if (equalsIndex >= 0)
+          B.JSArray_methods.add$1(indices, equalsIndex);
+        else {
+          lastSeparator = B.JSArray_methods.get$last(indices);
+          if (char !== 44 || i !== lastSeparator + 7 || !B.JSString_methods.startsWith$2(text, "base64", lastSeparator + 1))
+            throw A.wrapException(A.FormatException$("Expecting '='", text, i));
+          break;
+        }
+      }
+      B.JSArray_methods.add$1(indices, i);
+      t2 = i + 1;
+      if ((indices.length & 1) === 1)
+        text = B.C_Base64Codec.normalize$3(text, t2, t1);
+      else {
+        data = A._Uri__normalize(text, t2, t1, B.List_42A, true, false);
+        if (data != null)
+          text = B.JSString_methods.replaceRange$3(text, t2, t1, data);
+      }
+      return new A.UriData(text, indices, sourceUri);
+    },
+    _createTables() {
+      var _i, t1, t2, t3, b,
+        _s77_ = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz-._~!$&'()*+,;=",
+        _s1_ = ".", _s1_0 = ":", _s1_1 = "/", _s1_2 = "\\", _s1_3 = "?", _s1_4 = "#", _s2_ = "/\\",
+        tables = A._setArrayType(new Array(22), type$.JSArray_Uint8List);
+      for (_i = 0; _i < 22; ++_i)
+        tables[_i] = new Uint8Array(96);
+      t1 = new A._createTables_build(tables);
+      t2 = new A._createTables_setChars();
+      t3 = new A._createTables_setRange();
+      b = t1.call$2(0, 225);
+      t2.call$3(b, _s77_, 1);
+      t2.call$3(b, _s1_, 14);
+      t2.call$3(b, _s1_0, 34);
+      t2.call$3(b, _s1_1, 3);
+      t2.call$3(b, _s1_2, 227);
+      t2.call$3(b, _s1_3, 172);
+      t2.call$3(b, _s1_4, 205);
+      b = t1.call$2(14, 225);
+      t2.call$3(b, _s77_, 1);
+      t2.call$3(b, _s1_, 15);
+      t2.call$3(b, _s1_0, 34);
+      t2.call$3(b, _s2_, 234);
+      t2.call$3(b, _s1_3, 172);
+      t2.call$3(b, _s1_4, 205);
+      b = t1.call$2(15, 225);
+      t2.call$3(b, _s77_, 1);
+      t2.call$3(b, "%", 225);
+      t2.call$3(b, _s1_0, 34);
+      t2.call$3(b, _s1_1, 9);
+      t2.call$3(b, _s1_2, 233);
+      t2.call$3(b, _s1_3, 172);
+      t2.call$3(b, _s1_4, 205);
+      b = t1.call$2(1, 225);
+      t2.call$3(b, _s77_, 1);
+      t2.call$3(b, _s1_0, 34);
+      t2.call$3(b, _s1_1, 10);
+      t2.call$3(b, _s1_2, 234);
+      t2.call$3(b, _s1_3, 172);
+      t2.call$3(b, _s1_4, 205);
+      b = t1.call$2(2, 235);
+      t2.call$3(b, _s77_, 139);
+      t2.call$3(b, _s1_1, 131);
+      t2.call$3(b, _s1_2, 131);
+      t2.call$3(b, _s1_, 146);
+      t2.call$3(b, _s1_3, 172);
+      t2.call$3(b, _s1_4, 205);
+      b = t1.call$2(3, 235);
+      t2.call$3(b, _s77_, 11);
+      t2.call$3(b, _s1_1, 68);
+      t2.call$3(b, _s1_2, 68);
+      t2.call$3(b, _s1_, 18);
+      t2.call$3(b, _s1_3, 172);
+      t2.call$3(b, _s1_4, 205);
+      b = t1.call$2(4, 229);
+      t2.call$3(b, _s77_, 5);
+      t3.call$3(b, "AZ", 229);
+      t2.call$3(b, _s1_0, 102);
+      t2.call$3(b, "@", 68);
+      t2.call$3(b, "[", 232);
+      t2.call$3(b, _s1_1, 138);
+      t2.call$3(b, _s1_2, 138);
+      t2.call$3(b, _s1_3, 172);
+      t2.call$3(b, _s1_4, 205);
+      b = t1.call$2(5, 229);
+      t2.call$3(b, _s77_, 5);
+      t3.call$3(b, "AZ", 229);
+      t2.call$3(b, _s1_0, 102);
+      t2.call$3(b, "@", 68);
+      t2.call$3(b, _s1_1, 138);
+      t2.call$3(b, _s1_2, 138);
+      t2.call$3(b, _s1_3, 172);
+      t2.call$3(b, _s1_4, 205);
+      b = t1.call$2(6, 231);
+      t3.call$3(b, "19", 7);
+      t2.call$3(b, "@", 68);
+      t2.call$3(b, _s1_1, 138);
+      t2.call$3(b, _s1_2, 138);
+      t2.call$3(b, _s1_3, 172);
+      t2.call$3(b, _s1_4, 205);
+      b = t1.call$2(7, 231);
+      t3.call$3(b, "09", 7);
+      t2.call$3(b, "@", 68);
+      t2.call$3(b, _s1_1, 138);
+      t2.call$3(b, _s1_2, 138);
+      t2.call$3(b, _s1_3, 172);
+      t2.call$3(b, _s1_4, 205);
+      t2.call$3(t1.call$2(8, 8), "]", 5);
+      b = t1.call$2(9, 235);
+      t2.call$3(b, _s77_, 11);
+      t2.call$3(b, _s1_, 16);
+      t2.call$3(b, _s2_, 234);
+      t2.call$3(b, _s1_3, 172);
+      t2.call$3(b, _s1_4, 205);
+      b = t1.call$2(16, 235);
+      t2.call$3(b, _s77_, 11);
+      t2.call$3(b, _s1_, 17);
+      t2.call$3(b, _s2_, 234);
+      t2.call$3(b, _s1_3, 172);
+      t2.call$3(b, _s1_4, 205);
+      b = t1.call$2(17, 235);
+      t2.call$3(b, _s77_, 11);
+      t2.call$3(b, _s1_1, 9);
+      t2.call$3(b, _s1_2, 233);
+      t2.call$3(b, _s1_3, 172);
+      t2.call$3(b, _s1_4, 205);
+      b = t1.call$2(10, 235);
+      t2.call$3(b, _s77_, 11);
+      t2.call$3(b, _s1_, 18);
+      t2.call$3(b, _s1_1, 10);
+      t2.call$3(b, _s1_2, 234);
+      t2.call$3(b, _s1_3, 172);
+      t2.call$3(b, _s1_4, 205);
+      b = t1.call$2(18, 235);
+      t2.call$3(b, _s77_, 11);
+      t2.call$3(b, _s1_, 19);
+      t2.call$3(b, _s2_, 234);
+      t2.call$3(b, _s1_3, 172);
+      t2.call$3(b, _s1_4, 205);
+      b = t1.call$2(19, 235);
+      t2.call$3(b, _s77_, 11);
+      t2.call$3(b, _s2_, 234);
+      t2.call$3(b, _s1_3, 172);
+      t2.call$3(b, _s1_4, 205);
+      b = t1.call$2(11, 235);
+      t2.call$3(b, _s77_, 11);
+      t2.call$3(b, _s1_1, 10);
+      t2.call$3(b, _s1_2, 234);
+      t2.call$3(b, _s1_3, 172);
+      t2.call$3(b, _s1_4, 205);
+      b = t1.call$2(12, 236);
+      t2.call$3(b, _s77_, 12);
+      t2.call$3(b, _s1_3, 12);
+      t2.call$3(b, _s1_4, 205);
+      b = t1.call$2(13, 237);
+      t2.call$3(b, _s77_, 13);
+      t2.call$3(b, _s1_3, 13);
+      t3.call$3(t1.call$2(20, 245), "az", 21);
+      b = t1.call$2(21, 245);
+      t3.call$3(b, "az", 21);
+      t3.call$3(b, "09", 21);
+      t2.call$3(b, "+-.", 21);
+      return tables;
+    },
+    _scan(uri, start, end, state, indices) {
+      var t1, i, table, char, transition,
+        tables = $.$get$_scannerTables();
+      for (t1 = uri.length, i = start; i < end; ++i) {
+        if (!(state >= 0 && state < tables.length))
+          return A.ioore(tables, state);
+        table = tables[state];
+        if (!(i < t1))
+          return A.ioore(uri, i);
+        char = uri.charCodeAt(i) ^ 96;
+        transition = table[char > 95 ? 31 : char];
+        state = transition & 31;
+        B.JSArray_methods.$indexSet(indices, transition >>> 5, i);
+      }
+      return state;
+    },
     Error: function Error() {
     },
     AssertionError: function AssertionError(t0) {
@@ -3749,13 +4973,17 @@
     ConcurrentModificationError: function ConcurrentModificationError(t0) {
       this.modifiedObject = t0;
     },
+    OutOfMemoryError: function OutOfMemoryError() {
+    },
     StackOverflowError: function StackOverflowError() {
     },
     _Exception: function _Exception(t0) {
       this.message = t0;
     },
-    FormatException: function FormatException(t0) {
+    FormatException: function FormatException(t0, t1, t2) {
       this.message = t0;
+      this.source = t1;
+      this.offset = t2;
     },
     Iterable: function Iterable() {
     },
@@ -3767,6 +4995,62 @@
     },
     StringBuffer: function StringBuffer(t0) {
       this._contents = t0;
+    },
+    Uri__parseIPv4Address_error: function Uri__parseIPv4Address_error(t0) {
+      this.host = t0;
+    },
+    Uri_parseIPv6Address_error: function Uri_parseIPv6Address_error(t0) {
+      this.host = t0;
+    },
+    Uri_parseIPv6Address_parseHex: function Uri_parseIPv6Address_parseHex(t0, t1) {
+      this.error = t0;
+      this.host = t1;
+    },
+    _Uri: function _Uri(t0, t1, t2, t3, t4, t5, t6) {
+      var _ = this;
+      _.scheme = t0;
+      _._userInfo = t1;
+      _._host = t2;
+      _._port = t3;
+      _.path = t4;
+      _._query = t5;
+      _._fragment = t6;
+      _.___Uri_hashCode_FI = _.___Uri__text_FI = $;
+    },
+    UriData: function UriData(t0, t1, t2) {
+      this._text = t0;
+      this._separatorIndices = t1;
+      this._uriCache = t2;
+    },
+    _createTables_build: function _createTables_build(t0) {
+      this.tables = t0;
+    },
+    _createTables_setChars: function _createTables_setChars() {
+    },
+    _createTables_setRange: function _createTables_setRange() {
+    },
+    _SimpleUri: function _SimpleUri(t0, t1, t2, t3, t4, t5, t6, t7) {
+      var _ = this;
+      _._uri = t0;
+      _._schemeEnd = t1;
+      _._hostStart = t2;
+      _._portStart = t3;
+      _._pathStart = t4;
+      _._queryStart = t5;
+      _._fragmentStart = t6;
+      _._schemeCache = t7;
+      _._hashCodeCache = null;
+    },
+    _DataUri: function _DataUri(t0, t1, t2, t3, t4, t5, t6) {
+      var _ = this;
+      _.scheme = t0;
+      _._userInfo = t1;
+      _._host = t2;
+      _._port = t3;
+      _.path = t4;
+      _._query = t5;
+      _._fragment = t6;
+      _.___Uri_hashCode_FI = _.___Uri__text_FI = $;
     },
     HttpRequest_getString(url) {
       var _null = null;
@@ -3890,9 +5174,9 @@
     FixedSizeListIterator: function FixedSizeListIterator(t0, t1, t2) {
       var _ = this;
       _._array = t0;
-      _._html$_length = t1;
+      _._length = t1;
       _._position = -1;
-      _._html$_current = null;
+      _._current = null;
       _.$ti = t2;
     },
     _HtmlCollection_JavaScriptObject_ListMixin: function _HtmlCollection_JavaScriptObject_ListMixin() {
@@ -3939,7 +5223,7 @@
               // Function start
               $async$handler = 3;
               $async$goto = 6;
-              return A._asyncAwait(A.HttpRequest_getString(string$.https_), $async$loadItems);
+              return A._asyncAwait(A.HttpRequest_getString(A.S($.$get$backendUrl()) + "/items"), $async$loadItems);
             case 6:
               // returning from await.
               response = $async$result;
@@ -3995,7 +5279,7 @@
         t3.toString;
         t4 = t2.createElement("td");
         t4.toString;
-        t5 = J.getInterceptor$ax(item);
+        t5 = J.getInterceptor$asx(item);
         B.TableCellElement_methods.set$text(t4, A._asStringQ(t5.$index(item, "name")));
         t3.appendChild(t4).toString;
         t2 = t2.createElement("td");
@@ -4004,6 +5288,8 @@
         t3.appendChild(t2).toString;
         tableBody.appendChild(t3).toString;
       }
+    },
+    backendUrl_closure: function backendUrl_closure() {
     },
     main_closure: function main_closure(t0, t1, t2) {
       this.itemNameInput = t0;
@@ -4116,10 +5402,23 @@
       var t1 = A._arrayInstanceType(receiver);
       return new A.MappedListIterable(receiver, t1._bind$1($T)._eval$1("1(2)")._as(f), t1._eval$1("@<1>")._bind$1($T)._eval$1("MappedListIterable<1,2>"));
     },
+    join$1(receiver, separator) {
+      var i,
+        list = A.List_List$filled(receiver.length, "", false, type$.String);
+      for (i = 0; i < receiver.length; ++i)
+        this.$indexSet(list, i, A.S(receiver[i]));
+      return list.join(separator);
+    },
     elementAt$1(receiver, index) {
-      if (!(index < receiver.length))
+      if (!(index >= 0 && index < receiver.length))
         return A.ioore(receiver, index);
       return receiver[index];
+    },
+    get$last(receiver) {
+      var t1 = receiver.length;
+      if (t1 > 0)
+        return receiver[t1 - 1];
+      throw A.wrapException(A.IterableElementError_noElement());
     },
     get$isNotEmpty(receiver) {
       return receiver.length !== 0;
@@ -4157,28 +5456,28 @@
   J.JSUnmodifiableArray.prototype = {};
   J.ArrayIterator.prototype = {
     get$current() {
-      var t1 = this._current;
+      var t1 = this.__interceptors$_current;
       return t1 == null ? this.$ti._precomputed1._as(t1) : t1;
     },
     moveNext$0() {
       var t2, _this = this,
         t1 = _this._iterable,
         $length = t1.length;
-      if (_this._length !== $length) {
+      if (_this.__interceptors$_length !== $length) {
         t1 = A.throwConcurrentModificationError(t1);
         throw A.wrapException(t1);
       }
       t2 = _this._index;
       if (t2 >= $length) {
-        _this.set$_current(null);
+        _this.set$__interceptors$_current(null);
         return false;
       }
-      _this.set$_current(t1[t2]);
+      _this.set$__interceptors$_current(t1[t2]);
       ++_this._index;
       return true;
     },
-    set$_current(_current) {
-      this._current = this.$ti._eval$1("1?")._as(_current);
+    set$__interceptors$_current(_current) {
+      this.__interceptors$_current = this.$ti._eval$1("1?")._as(_current);
     }
   };
   J.JSNumber.prototype = {
@@ -4199,6 +5498,14 @@
       scaled = absolute < 1 ? absolute / factor : factor / absolute;
       return ((scaled * 9007199254740992 | 0) + (scaled * 3542243181176521 | 0)) * 599197 + floorLog2 * 1259 & 536870911;
     },
+    $mod(receiver, other) {
+      var result = receiver % other;
+      if (result === 0)
+        return 0;
+      if (result > 0)
+        return result;
+      return result + other;
+    },
     _shrOtherPositive$1(receiver, other) {
       var t1;
       if (receiver > 0)
@@ -4208,6 +5515,11 @@
         t1 = receiver >> t1 >>> 0;
       }
       return t1;
+    },
+    _shrReceiverPositive$1(receiver, other) {
+      if (0 > other)
+        throw A.wrapException(A.argumentErrorValue(other));
+      return this._shrBothPositive$1(receiver, other);
     },
     _shrBothPositive$1(receiver, other) {
       return other > 31 ? 0 : receiver >>> other;
@@ -4234,8 +5546,27 @@
     $add(receiver, other) {
       return receiver + other;
     },
+    replaceRange$3(receiver, start, end, replacement) {
+      var e = A.RangeError_checkValidRange(start, end, receiver.length);
+      return A.stringReplaceRangeUnchecked(receiver, start, e, replacement);
+    },
+    startsWith$2(receiver, pattern, index) {
+      var endIndex;
+      if (index < 0 || index > receiver.length)
+        throw A.wrapException(A.RangeError$range(index, 0, receiver.length, null, null));
+      endIndex = index + pattern.length;
+      if (endIndex > receiver.length)
+        return false;
+      return pattern === receiver.substring(index, endIndex);
+    },
+    startsWith$1(receiver, pattern) {
+      return this.startsWith$2(receiver, pattern, 0);
+    },
     substring$2(receiver, start, end) {
       return receiver.substring(start, A.RangeError_checkValidRange(start, end, receiver.length));
+    },
+    substring$1(receiver, start) {
+      return this.substring$2(receiver, start, null);
     },
     trim$0(receiver) {
       var startIndex, t1, endIndex0,
@@ -4259,6 +5590,34 @@
         return result;
       return result.substring(startIndex, endIndex0);
     },
+    $mul(receiver, times) {
+      var s, result;
+      if (0 >= times)
+        return "";
+      if (times === 1 || receiver.length === 0)
+        return receiver;
+      if (times !== times >>> 0)
+        throw A.wrapException(B.C_OutOfMemoryError);
+      for (s = receiver, result = ""; true;) {
+        if ((times & 1) === 1)
+          result = s + result;
+        times = times >>> 1;
+        if (times === 0)
+          break;
+        s += s;
+      }
+      return result;
+    },
+    indexOf$2(receiver, pattern, start) {
+      var t1;
+      if (start < 0 || start > receiver.length)
+        throw A.wrapException(A.RangeError$range(start, 0, receiver.length, null, null));
+      t1 = receiver.indexOf(pattern, start);
+      return t1;
+    },
+    indexOf$1(receiver, pattern) {
+      return this.indexOf$2(receiver, pattern, 0);
+    },
     toString$0(receiver) {
       return receiver;
     },
@@ -4280,6 +5639,7 @@
       return receiver.length;
     },
     $isTrustedGetRuntimeType: 1,
+    $isPattern: 1,
     $isString: 1
   };
   A.LateError.prototype = {
@@ -4330,6 +5690,7 @@
       return this._f.call$1(J.elementAt$1$ax(this._source, index));
     }
   };
+  A.FixedLengthListMixin.prototype = {};
   A.TypeErrorDecoder.prototype = {
     matchTypeError$1(message) {
       var result, t1, _this = this,
@@ -4621,14 +5982,99 @@
     call$2(o, tag) {
       return this.getUnknownTag(o, tag);
     },
-    $signature: 7
+    $signature: 8
   };
   A.initHooks_closure1.prototype = {
     call$1(tag) {
       return this.prototypeForTag(A._asString(tag));
     },
-    $signature: 8
+    $signature: 9
   };
+  A.JSSyntaxRegExp.prototype = {
+    toString$0(_) {
+      return "RegExp/" + this.pattern + "/" + this._nativeRegExp.flags;
+    },
+    firstMatch$1(string) {
+      var m = this._nativeRegExp.exec(string);
+      if (m == null)
+        return null;
+      return new A._MatchImplementation(m);
+    },
+    $isPattern: 1,
+    $isRegExp: 1
+  };
+  A._MatchImplementation.prototype = {$isMatch: 1};
+  A.StringMatch.prototype = {$isMatch: 1};
+  A._StringAllMatchesIterator.prototype = {
+    moveNext$0() {
+      var index, end, _this = this,
+        t1 = _this.__js_helper$_index,
+        t2 = _this._pattern,
+        t3 = t2.length,
+        t4 = _this._input,
+        t5 = t4.length;
+      if (t1 + t3 > t5) {
+        _this.__js_helper$_current = null;
+        return false;
+      }
+      index = t4.indexOf(t2, t1);
+      if (index < 0) {
+        _this.__js_helper$_index = t5 + 1;
+        _this.__js_helper$_current = null;
+        return false;
+      }
+      end = index + t3;
+      _this.__js_helper$_current = new A.StringMatch(index, t2);
+      _this.__js_helper$_index = end === _this.__js_helper$_index ? end + 1 : end;
+      return true;
+    },
+    get$current() {
+      var t1 = this.__js_helper$_current;
+      t1.toString;
+      return t1;
+    }
+  };
+  A.NativeTypedData.prototype = {};
+  A.NativeTypedArray.prototype = {
+    get$length(receiver) {
+      return receiver.length;
+    },
+    $isJavaScriptIndexingBehavior: 1
+  };
+  A.NativeTypedArrayOfInt.prototype = {
+    $indexSet(receiver, index, value) {
+      A._checkValidIndex(index, receiver, receiver.length);
+      receiver[index] = value;
+    },
+    $isIterable: 1,
+    $isList: 1
+  };
+  A.NativeInt8List.prototype = {
+    get$runtimeType(receiver) {
+      return B.Type_Int8List_woc;
+    },
+    $index(receiver, index) {
+      A._checkValidIndex(index, receiver, receiver.length);
+      return receiver[index];
+    },
+    $isTrustedGetRuntimeType: 1
+  };
+  A.NativeUint8List.prototype = {
+    get$runtimeType(receiver) {
+      return B.Type_Uint8List_CSc;
+    },
+    get$length(receiver) {
+      return receiver.length;
+    },
+    $index(receiver, index) {
+      A._checkValidIndex(index, receiver, receiver.length);
+      return receiver[index];
+    },
+    $isTrustedGetRuntimeType: 1,
+    $isUint8List: 1
+  };
+  A._NativeTypedArrayOfInt_NativeTypedArray_ListMixin.prototype = {};
+  A._NativeTypedArrayOfInt_NativeTypedArray_ListMixin_FixedLengthListMixin.prototype = {};
   A.Rti.prototype = {
     _eval$1(recipe) {
       return A._Universe_evalInEnvironment(init.typeUniverse, this, recipe);
@@ -4666,7 +6112,7 @@
       t2 = this.span;
       t1.firstChild ? t1.removeChild(t2) : t1.appendChild(t2);
     },
-    $signature: 9
+    $signature: 10
   };
   A._AsyncRun__scheduleImmediateJsOverride_internalCallback.prototype = {
     call$0() {
@@ -4723,19 +6169,19 @@
     call$1(result) {
       return this.bodyFunction.call$2(0, result);
     },
-    $signature: 10
+    $signature: 11
   };
   A._awaitOnObject_closure0.prototype = {
     call$2(error, stackTrace) {
       this.bodyFunction.call$2(1, new A.ExceptionAndStackTrace(error, type$.StackTrace._as(stackTrace)));
     },
-    $signature: 11
+    $signature: 12
   };
   A._wrapJsFunctionForAsync_closure.prototype = {
     call$2(errorCode, result) {
       this.$protected(A._asInt(errorCode), result);
     },
-    $signature: 12
+    $signature: 13
   };
   A.AsyncError.prototype = {
     toString$0(_) {
@@ -4991,7 +6437,7 @@
     call$2(error, stackTrace) {
       this.$this._completeError$2(type$.Object._as(error), type$.StackTrace._as(stackTrace));
     },
-    $signature: 14
+    $signature: 15
   };
   A._Future__chainForeignFuture_closure1.prototype = {
     call$0() {
@@ -5056,7 +6502,7 @@
     call$1(_) {
       return this.originalSource;
     },
-    $signature: 15
+    $signature: 16
   };
   A._Future__propagateToListeners_handleValueCallback.prototype = {
     call$0() {
@@ -5240,6 +6686,13 @@
       var t1 = A.instanceType(receiver);
       return new A.MappedListIterable(receiver, t1._bind$1($T)._eval$1("1(ListBase.E)")._as(f), t1._eval$1("@<ListBase.E>")._bind$1($T)._eval$1("MappedListIterable<1,2>"));
     },
+    fillRange$3(receiver, start, end, fill) {
+      var i;
+      A.instanceType(receiver)._eval$1("ListBase.E?")._as(fill);
+      A.RangeError_checkValidRange(start, end, this.get$length(receiver));
+      for (i = start; i < end; ++i)
+        this.$indexSet(receiver, i, fill);
+    },
     toString$0(receiver) {
       return A.Iterable_iterableToFullString(receiver, "[", "]");
     }
@@ -5352,7 +6805,7 @@
         t1 = t1.get$keys().elementAt$1(0, index);
       else {
         t1 = t1._computeKeys$0();
-        if (!(index < t1.length))
+        if (!(index >= 0 && index < t1.length))
           return A.ioore(t1, index);
         t1 = t1[index];
       }
@@ -5370,6 +6823,111 @@
       return t1;
     }
   };
+  A.Base64Codec.prototype = {
+    normalize$3(source, start, end) {
+      var inverseAlphabet, t2, i, sliceStart, buffer, firstPadding, firstPaddingSourceIndex, paddingCount, i0, char, i1, digit1, t3, digit2, char0, value, t4, endLength, $length,
+        _s64_ = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/",
+        _s31_ = "Invalid base64 encoding length ",
+        t1 = source.length;
+      end = A.RangeError_checkValidRange(start, end, t1);
+      inverseAlphabet = $.$get$_Base64Decoder__inverseAlphabet();
+      for (t2 = inverseAlphabet.length, i = start, sliceStart = i, buffer = null, firstPadding = -1, firstPaddingSourceIndex = -1, paddingCount = 0; i < end; i = i0) {
+        i0 = i + 1;
+        if (!(i < t1))
+          return A.ioore(source, i);
+        char = source.charCodeAt(i);
+        if (char === 37) {
+          i1 = i0 + 2;
+          if (i1 <= end) {
+            if (!(i0 < t1))
+              return A.ioore(source, i0);
+            digit1 = A.hexDigitValue(source.charCodeAt(i0));
+            t3 = i0 + 1;
+            if (!(t3 < t1))
+              return A.ioore(source, t3);
+            digit2 = A.hexDigitValue(source.charCodeAt(t3));
+            char0 = digit1 * 16 + digit2 - (digit2 & 256);
+            if (char0 === 37)
+              char0 = -1;
+            i0 = i1;
+          } else
+            char0 = -1;
+        } else
+          char0 = char;
+        if (0 <= char0 && char0 <= 127) {
+          if (!(char0 >= 0 && char0 < t2))
+            return A.ioore(inverseAlphabet, char0);
+          value = inverseAlphabet[char0];
+          if (value >= 0) {
+            if (!(value < 64))
+              return A.ioore(_s64_, value);
+            char0 = _s64_.charCodeAt(value);
+            if (char0 === char)
+              continue;
+            char = char0;
+          } else {
+            if (value === -1) {
+              if (firstPadding < 0) {
+                t3 = buffer == null ? null : buffer._contents.length;
+                if (t3 == null)
+                  t3 = 0;
+                firstPadding = t3 + (i - sliceStart);
+                firstPaddingSourceIndex = i;
+              }
+              ++paddingCount;
+              if (char === 61)
+                continue;
+            }
+            char = char0;
+          }
+          if (value !== -2) {
+            if (buffer == null) {
+              buffer = new A.StringBuffer("");
+              t3 = buffer;
+            } else
+              t3 = buffer;
+            t3._contents += B.JSString_methods.substring$2(source, sliceStart, i);
+            t4 = A.Primitives_stringFromCharCode(char);
+            t3._contents += t4;
+            sliceStart = i0;
+            continue;
+          }
+        }
+        throw A.wrapException(A.FormatException$("Invalid base64 data", source, i));
+      }
+      if (buffer != null) {
+        t1 = B.JSString_methods.substring$2(source, sliceStart, end);
+        t1 = buffer._contents += t1;
+        t2 = t1.length;
+        if (firstPadding >= 0)
+          A.Base64Codec__checkPadding(source, firstPaddingSourceIndex, end, firstPadding, paddingCount, t2);
+        else {
+          endLength = B.JSInt_methods.$mod(t2 - 1, 4) + 1;
+          if (endLength === 1)
+            throw A.wrapException(A.FormatException$(_s31_, source, end));
+          for (; endLength < 4;) {
+            t1 += "=";
+            buffer._contents = t1;
+            ++endLength;
+          }
+        }
+        t1 = buffer._contents;
+        return B.JSString_methods.replaceRange$3(source, start, end, t1.charCodeAt(0) == 0 ? t1 : t1);
+      }
+      $length = end - start;
+      if (firstPadding >= 0)
+        A.Base64Codec__checkPadding(source, firstPaddingSourceIndex, end, firstPadding, paddingCount, $length);
+      else {
+        endLength = B.JSInt_methods.$mod($length, 4);
+        if (endLength === 1)
+          throw A.wrapException(A.FormatException$(_s31_, source, end));
+        if (endLength > 1)
+          source = B.JSString_methods.replaceRange$3(source, end, end, endLength === 2 ? "==" : "=");
+      }
+      return source;
+    }
+  };
+  A.Base64Encoder.prototype = {};
   A.Codec.prototype = {};
   A.Converter.prototype = {};
   A.JsonUnsupportedObjectError.prototype = {
@@ -5736,6 +7294,15 @@
       return "Concurrent modification during iteration: " + A.Error_safeToString(t1) + ".";
     }
   };
+  A.OutOfMemoryError.prototype = {
+    toString$0(_) {
+      return "Out of Memory";
+    },
+    get$stackTrace() {
+      return null;
+    },
+    $isError: 1
+  };
   A.StackOverflowError.prototype = {
     toString$0(_) {
       return "Stack Overflow";
@@ -5752,9 +7319,73 @@
   };
   A.FormatException.prototype = {
     toString$0(_) {
-      var message = this.message,
-        report = "" !== message ? "FormatException: " + message : "FormatException";
-      return report;
+      var t1, lineEnd, lineNum, lineStart, previousCharWasCR, i, char, prefix, postfix, end, start,
+        message = this.message,
+        report = "" !== message ? "FormatException: " + message : "FormatException",
+        offset = this.offset,
+        source = this.source;
+      if (typeof source == "string") {
+        if (offset != null)
+          t1 = offset < 0 || offset > source.length;
+        else
+          t1 = false;
+        if (t1)
+          offset = null;
+        if (offset == null) {
+          if (source.length > 78)
+            source = B.JSString_methods.substring$2(source, 0, 75) + "...";
+          return report + "\n" + source;
+        }
+        for (lineEnd = source.length, lineNum = 1, lineStart = 0, previousCharWasCR = false, i = 0; i < offset; ++i) {
+          if (!(i < lineEnd))
+            return A.ioore(source, i);
+          char = source.charCodeAt(i);
+          if (char === 10) {
+            if (lineStart !== i || !previousCharWasCR)
+              ++lineNum;
+            lineStart = i + 1;
+            previousCharWasCR = false;
+          } else if (char === 13) {
+            ++lineNum;
+            lineStart = i + 1;
+            previousCharWasCR = true;
+          }
+        }
+        report = lineNum > 1 ? report + (" (at line " + lineNum + ", character " + (offset - lineStart + 1) + ")\n") : report + (" (at character " + (offset + 1) + ")\n");
+        for (i = offset; i < lineEnd; ++i) {
+          if (!(i >= 0))
+            return A.ioore(source, i);
+          char = source.charCodeAt(i);
+          if (char === 10 || char === 13) {
+            lineEnd = i;
+            break;
+          }
+        }
+        prefix = "";
+        if (lineEnd - lineStart > 78) {
+          postfix = "...";
+          if (offset - lineStart < 75) {
+            end = lineStart + 75;
+            start = lineStart;
+          } else {
+            if (lineEnd - offset < 75) {
+              start = lineEnd - 75;
+              end = lineEnd;
+              postfix = "";
+            } else {
+              start = offset - 36;
+              end = offset + 36;
+            }
+            prefix = "...";
+          }
+        } else {
+          end = lineEnd;
+          start = lineStart;
+          postfix = "";
+        }
+        return report + prefix + B.JSString_methods.substring$2(source, start, end) + postfix + "\n" + B.JSString_methods.$mul(" ", offset - start + prefix.length) + "^\n";
+      } else
+        return offset != null ? report + (" (at offset " + A.S(offset) + ")") : report;
     }
   };
   A.Iterable.prototype = {
@@ -5766,8 +7397,9 @@
       return count;
     },
     elementAt$1(_, index) {
-      var skipCount,
-        iterator = this.get$iterator(this);
+      var iterator, skipCount;
+      A.RangeError_checkNotNegative(index, "index");
+      iterator = this.get$iterator(this);
       for (skipCount = index; iterator.moveNext$0();) {
         if (skipCount === 0)
           return iterator.get$current();
@@ -5820,6 +7452,327 @@
     },
     $isStringSink: 1
   };
+  A.Uri__parseIPv4Address_error.prototype = {
+    call$2(msg, position) {
+      throw A.wrapException(A.FormatException$("Illegal IPv4 address, " + msg, this.host, position));
+    },
+    $signature: 17
+  };
+  A.Uri_parseIPv6Address_error.prototype = {
+    call$2(msg, position) {
+      throw A.wrapException(A.FormatException$("Illegal IPv6 address, " + msg, this.host, position));
+    },
+    $signature: 18
+  };
+  A.Uri_parseIPv6Address_parseHex.prototype = {
+    call$2(start, end) {
+      var value;
+      if (end - start > 4)
+        this.error.call$2("an IPv6 part can only contain a maximum of 4 hex digits", start);
+      value = A.int_parse(B.JSString_methods.substring$2(this.host, start, end), 16);
+      if (value < 0 || value > 65535)
+        this.error.call$2("each part must be in the range of `0x0..0xFFFF`", start);
+      return value;
+    },
+    $signature: 19
+  };
+  A._Uri.prototype = {
+    get$_text() {
+      var t1, t2, t3, t4, _this = this,
+        value = _this.___Uri__text_FI;
+      if (value === $) {
+        t1 = _this.scheme;
+        t2 = t1.length !== 0 ? "" + t1 + ":" : "";
+        t3 = _this._host;
+        t4 = t3 == null;
+        if (!t4 || t1 === "file") {
+          t1 = t2 + "//";
+          t2 = _this._userInfo;
+          if (t2.length !== 0)
+            t1 = t1 + t2 + "@";
+          if (!t4)
+            t1 += t3;
+          t2 = _this._port;
+          if (t2 != null)
+            t1 = t1 + ":" + A.S(t2);
+        } else
+          t1 = t2;
+        t1 += _this.path;
+        t2 = _this._query;
+        if (t2 != null)
+          t1 = t1 + "?" + t2;
+        t2 = _this._fragment;
+        if (t2 != null)
+          t1 = t1 + "#" + t2;
+        value !== $ && A.throwLateFieldADI("_text");
+        value = _this.___Uri__text_FI = t1.charCodeAt(0) == 0 ? t1 : t1;
+      }
+      return value;
+    },
+    get$hashCode(_) {
+      var result, _this = this,
+        value = _this.___Uri_hashCode_FI;
+      if (value === $) {
+        result = B.JSString_methods.get$hashCode(_this.get$_text());
+        _this.___Uri_hashCode_FI !== $ && A.throwLateFieldADI("hashCode");
+        _this.___Uri_hashCode_FI = result;
+        value = result;
+      }
+      return value;
+    },
+    get$userInfo() {
+      return this._userInfo;
+    },
+    get$host(_) {
+      var host = this._host;
+      if (host == null)
+        return "";
+      if (B.JSString_methods.startsWith$1(host, "["))
+        return B.JSString_methods.substring$2(host, 1, host.length - 1);
+      return host;
+    },
+    get$port(_) {
+      var t1 = this._port;
+      return t1 == null ? A._Uri__defaultPort(this.scheme) : t1;
+    },
+    get$query() {
+      var t1 = this._query;
+      return t1 == null ? "" : t1;
+    },
+    get$fragment() {
+      var t1 = this._fragment;
+      return t1 == null ? "" : t1;
+    },
+    replace$3$host$path$port(host, path, port) {
+      var _this = this,
+        scheme = _this.scheme;
+      port = _this._port;
+      host = A._Uri__makeHost(host, 0, host.length, false);
+      path = A._Uri__makePath(path, 0, path.length, null, scheme, host != null);
+      return A._Uri$_internal(scheme, _this._userInfo, host, port, path, _this._query, _this._fragment);
+    },
+    get$hasAuthority() {
+      return this._host != null;
+    },
+    get$hasQuery() {
+      return this._query != null;
+    },
+    get$hasFragment() {
+      return this._fragment != null;
+    },
+    toString$0(_) {
+      return this.get$_text();
+    },
+    $eq(_, other) {
+      var t1, t2, t3, _this = this;
+      if (other == null)
+        return false;
+      if (_this === other)
+        return true;
+      t1 = false;
+      if (type$.Uri._is(other))
+        if (_this.scheme === other.get$scheme())
+          if (_this._host != null === other.get$hasAuthority())
+            if (_this._userInfo === other.get$userInfo())
+              if (_this.get$host(0) === other.get$host(other))
+                if (_this.get$port(0) === other.get$port(other))
+                  if (_this.path === other.get$path(other)) {
+                    t2 = _this._query;
+                    t3 = t2 == null;
+                    if (!t3 === other.get$hasQuery()) {
+                      if (t3)
+                        t2 = "";
+                      if (t2 === other.get$query()) {
+                        t2 = _this._fragment;
+                        t3 = t2 == null;
+                        if (!t3 === other.get$hasFragment()) {
+                          t1 = t3 ? "" : t2;
+                          t1 = t1 === other.get$fragment();
+                        }
+                      }
+                    }
+                  }
+      return t1;
+    },
+    $isUri: 1,
+    get$scheme() {
+      return this.scheme;
+    },
+    get$path(receiver) {
+      return this.path;
+    }
+  };
+  A.UriData.prototype = {
+    get$uri() {
+      var t2, queryIndex, end, query, _this = this, _null = null,
+        t1 = _this._uriCache;
+      if (t1 == null) {
+        t1 = _this._separatorIndices;
+        if (0 >= t1.length)
+          return A.ioore(t1, 0);
+        t2 = _this._text;
+        t1 = t1[0] + 1;
+        queryIndex = B.JSString_methods.indexOf$2(t2, "?", t1);
+        end = t2.length;
+        if (queryIndex >= 0) {
+          query = A._Uri__normalizeOrSubstring(t2, queryIndex + 1, end, B.List_42A, false, false);
+          end = queryIndex;
+        } else
+          query = _null;
+        t1 = _this._uriCache = new A._DataUri("data", "", _null, _null, A._Uri__normalizeOrSubstring(t2, t1, end, B.List_M2I, false, false), query, _null);
+      }
+      return t1;
+    },
+    toString$0(_) {
+      var t2,
+        t1 = this._separatorIndices;
+      if (0 >= t1.length)
+        return A.ioore(t1, 0);
+      t2 = this._text;
+      return t1[0] === -1 ? "data:" + t2 : t2;
+    }
+  };
+  A._createTables_build.prototype = {
+    call$2(state, defaultTransition) {
+      var t1 = this.tables;
+      if (!(state < t1.length))
+        return A.ioore(t1, state);
+      t1 = t1[state];
+      B.NativeUint8List_methods.fillRange$3(t1, 0, 96, defaultTransition);
+      return t1;
+    },
+    $signature: 20
+  };
+  A._createTables_setChars.prototype = {
+    call$3(target, chars, transition) {
+      var t1, i, t2;
+      for (t1 = chars.length, i = 0; i < t1; ++i) {
+        t2 = chars.charCodeAt(i) ^ 96;
+        if (!(t2 < 96))
+          return A.ioore(target, t2);
+        target[t2] = transition;
+      }
+    },
+    $signature: 7
+  };
+  A._createTables_setRange.prototype = {
+    call$3(target, range, transition) {
+      var i, n,
+        t1 = range.length;
+      if (0 >= t1)
+        return A.ioore(range, 0);
+      i = range.charCodeAt(0);
+      if (1 >= t1)
+        return A.ioore(range, 1);
+      n = range.charCodeAt(1);
+      for (; i <= n; ++i) {
+        t1 = (i ^ 96) >>> 0;
+        if (!(t1 < 96))
+          return A.ioore(target, t1);
+        target[t1] = transition;
+      }
+    },
+    $signature: 7
+  };
+  A._SimpleUri.prototype = {
+    get$hasAuthority() {
+      return this._hostStart > 0;
+    },
+    get$hasPort() {
+      return this._hostStart > 0 && this._portStart + 1 < this._pathStart;
+    },
+    get$hasQuery() {
+      return this._queryStart < this._fragmentStart;
+    },
+    get$hasFragment() {
+      return this._fragmentStart < this._uri.length;
+    },
+    get$scheme() {
+      var t1 = this._schemeCache;
+      return t1 == null ? this._schemeCache = this._computeScheme$0() : t1;
+    },
+    _computeScheme$0() {
+      var t2, _this = this,
+        t1 = _this._schemeEnd;
+      if (t1 <= 0)
+        return "";
+      t2 = t1 === 4;
+      if (t2 && B.JSString_methods.startsWith$1(_this._uri, "http"))
+        return "http";
+      if (t1 === 5 && B.JSString_methods.startsWith$1(_this._uri, "https"))
+        return "https";
+      if (t2 && B.JSString_methods.startsWith$1(_this._uri, "file"))
+        return "file";
+      if (t1 === 7 && B.JSString_methods.startsWith$1(_this._uri, "package"))
+        return "package";
+      return B.JSString_methods.substring$2(_this._uri, 0, t1);
+    },
+    get$userInfo() {
+      var t1 = this._hostStart,
+        t2 = this._schemeEnd + 3;
+      return t1 > t2 ? B.JSString_methods.substring$2(this._uri, t2, t1 - 1) : "";
+    },
+    get$host(_) {
+      var t1 = this._hostStart;
+      return t1 > 0 ? B.JSString_methods.substring$2(this._uri, t1, this._portStart) : "";
+    },
+    get$port(_) {
+      var t1, _this = this;
+      if (_this.get$hasPort())
+        return A.int_parse(B.JSString_methods.substring$2(_this._uri, _this._portStart + 1, _this._pathStart), null);
+      t1 = _this._schemeEnd;
+      if (t1 === 4 && B.JSString_methods.startsWith$1(_this._uri, "http"))
+        return 80;
+      if (t1 === 5 && B.JSString_methods.startsWith$1(_this._uri, "https"))
+        return 443;
+      return 0;
+    },
+    get$path(_) {
+      return B.JSString_methods.substring$2(this._uri, this._pathStart, this._queryStart);
+    },
+    get$query() {
+      var t1 = this._queryStart,
+        t2 = this._fragmentStart;
+      return t1 < t2 ? B.JSString_methods.substring$2(this._uri, t1 + 1, t2) : "";
+    },
+    get$fragment() {
+      var t1 = this._fragmentStart,
+        t2 = this._uri;
+      return t1 < t2.length ? B.JSString_methods.substring$1(t2, t1 + 1) : "";
+    },
+    replace$3$host$path$port(host, path, port) {
+      var t2, query, fragment, _this = this, _null = null,
+        scheme = _this.get$scheme(),
+        t1 = _this._hostStart,
+        userInfo = t1 > 0 ? B.JSString_methods.substring$2(_this._uri, _this._schemeEnd + 3, t1) : "";
+      port = _this.get$hasPort() ? _this.get$port(0) : _null;
+      host = A._Uri__makeHost(host, 0, host.length, false);
+      path = A._Uri__makePath(path, 0, path.length, _null, scheme, host != null);
+      t1 = _this._queryStart;
+      t2 = _this._fragmentStart;
+      query = t1 < t2 ? B.JSString_methods.substring$2(_this._uri, t1 + 1, t2) : _null;
+      t1 = _this._fragmentStart;
+      t2 = _this._uri;
+      fragment = t1 < t2.length ? B.JSString_methods.substring$1(t2, t1 + 1) : _null;
+      return A._Uri$_internal(scheme, userInfo, host, port, path, query, fragment);
+    },
+    get$hashCode(_) {
+      var t1 = this._hashCodeCache;
+      return t1 == null ? this._hashCodeCache = B.JSString_methods.get$hashCode(this._uri) : t1;
+    },
+    $eq(_, other) {
+      if (other == null)
+        return false;
+      if (this === other)
+        return true;
+      return type$.Uri._is(other) && this._uri === other.toString$0(0);
+    },
+    toString$0(_) {
+      return this._uri;
+    },
+    $isUri: 1
+  };
+  A._DataUri.prototype = {};
   A.HtmlElement.prototype = {};
   A.AnchorElement.prototype = {
     toString$0(receiver) {
@@ -5884,8 +7837,12 @@
       t1.toString;
       return t1;
     },
+    $indexSet(receiver, index, value) {
+      type$.Node._as(value);
+      throw A.wrapException(A.UnsupportedError$("Cannot assign element of immutable List."));
+    },
     elementAt$1(receiver, index) {
-      if (!(index < receiver.length))
+      if (!(index >= 0 && index < receiver.length))
         return A.ioore(receiver, index);
       return receiver[index];
     },
@@ -5905,13 +7862,13 @@
       t1.toString;
       return t1;
     },
-    $signature: 16
+    $signature: 21
   };
   A.HttpRequest_request_closure.prototype = {
     call$2(header, value) {
       this.xhr.setRequestHeader(A._asString(header), A._asString(value));
     },
-    $signature: 17
+    $signature: 22
   };
   A.HttpRequest_request_closure0.prototype = {
     call$1(e) {
@@ -5929,7 +7886,7 @@
       else
         t3.completeError$1(e);
     },
-    $signature: 18
+    $signature: 23
   };
   A.HttpRequestEventTarget.prototype = {};
   A.InputElement.prototype = {
@@ -5976,7 +7933,7 @@
     call$1(e) {
       return this.onData.call$1(type$.Event._as(e));
     },
-    $signature: 19
+    $signature: 24
   };
   A.ImmutableListMixin.prototype = {
     get$iterator(receiver) {
@@ -5987,29 +7944,47 @@
     moveNext$0() {
       var _this = this,
         nextPosition = _this._position + 1,
-        t1 = _this._html$_length;
+        t1 = _this._length;
       if (nextPosition < t1) {
         t1 = _this._array;
         if (!(nextPosition >= 0 && nextPosition < t1.length))
           return A.ioore(t1, nextPosition);
-        _this.set$_html$_current(t1[nextPosition]);
+        _this.set$_current(t1[nextPosition]);
         _this._position = nextPosition;
         return true;
       }
-      _this.set$_html$_current(null);
+      _this.set$_current(null);
       _this._position = t1;
       return false;
     },
     get$current() {
-      var t1 = this._html$_current;
+      var t1 = this._current;
       return t1 == null ? this.$ti._precomputed1._as(t1) : t1;
     },
-    set$_html$_current(_current) {
-      this._html$_current = this.$ti._eval$1("1?")._as(_current);
+    set$_current(_current) {
+      this._current = this.$ti._eval$1("1?")._as(_current);
     }
   };
   A._HtmlCollection_JavaScriptObject_ListMixin.prototype = {};
   A._HtmlCollection_JavaScriptObject_ListMixin_ImmutableListMixin.prototype = {};
+  A.backendUrl_closure.prototype = {
+    call$0() {
+      var match, t1,
+        currentUrl = A.Uri_base(),
+        host = currentUrl.get$host(currentUrl);
+      if (A.stringContainsUnchecked(host, ".app.github.dev", 0)) {
+        match = A.RegExp_RegExp("-(\\d+)\\.app\\.github\\.dev$").firstMatch$1(host);
+        if (match != null) {
+          t1 = match._match;
+          if (1 >= t1.length)
+            return A.ioore(t1, 1);
+          t1 = t1[1];
+          return currentUrl.replace$3$host$path$port(A.stringReplaceFirstUnchecked(host, "-" + A.S(t1), "-8080", 0), "", null).get$_text();
+        }
+      }
+    },
+    $signature: 25
+  };
   A.main_closure.prototype = {
     call$1(_) {
       return this.$call$body$main_closure1(type$.MouseEvent._as(_));
@@ -6017,7 +7992,7 @@
     $call$body$main_closure1(_) {
       var $async$goto = 0,
         $async$completer = A._makeAsyncAwaitCompleter(type$.void),
-        $async$handler = 1, $async$currentError, $async$self = this, $name, amount, e, t3, t4, exception, t1, t2, $async$exception;
+        $async$handler = 1, $async$currentError, $async$self = this, $name, amount, e, t3, t4, t5, exception, t1, t2, $async$exception;
       var $async$call$1 = A._wrapJsFunctionForAsync(function($async$errorCode, $async$result) {
         if ($async$errorCode === 1) {
           $async$currentError = $async$result;
@@ -6041,10 +8016,11 @@
             case 2:
               // then
               $async$handler = 5;
-              t3 = type$.String;
-              t4 = B.C_JsonCodec.encode$2$toEncodable(A.LinkedHashMap_LinkedHashMap$_literal(["name", $name, "amount", amount], t3, type$.Object), null);
+              t3 = $.$get$backendUrl();
+              t4 = type$.String;
+              t5 = B.C_JsonCodec.encode$2$toEncodable(A.LinkedHashMap_LinkedHashMap$_literal(["name", $name, "amount", amount], t4, type$.Object), null);
               $async$goto = 8;
-              return A._asyncAwait(A.HttpRequest_request(string$.https_, "POST", null, A.LinkedHashMap_LinkedHashMap$_literal(["Content-Type", "application/json"], t3, t3), t4, null), $async$call$1);
+              return A._asyncAwait(A.HttpRequest_request(A.S(t3) + "/items", "POST", null, A.LinkedHashMap_LinkedHashMap$_literal(["Content-Type", "application/json"], t4, t4), t5, null), $async$call$1);
             case 8:
               // returning from await.
               B.InputElement_methods.set$value(t1, "");
@@ -6095,7 +8071,7 @@
     $call$body$main_closure0(_) {
       var $async$goto = 0,
         $async$completer = A._makeAsyncAwaitCompleter(type$.void),
-        $async$handler = 1, $async$currentError, $async$self = this, $name, newAmount, e, t3, t4, t5, exception, t1, t2, $async$exception;
+        $async$handler = 1, $async$currentError, $async$self = this, $name, newAmount, e, t3, t4, t5, t6, exception, t1, t2, $async$exception;
       var $async$call$1 = A._wrapJsFunctionForAsync(function($async$errorCode, $async$result) {
         if ($async$errorCode === 1) {
           $async$currentError = $async$result;
@@ -6119,11 +8095,12 @@
             case 2:
               // then
               $async$handler = 5;
-              t3 = A.S($name);
-              t4 = type$.String;
-              t5 = B.C_JsonCodec.encode$2$toEncodable(A.LinkedHashMap_LinkedHashMap$_literal(["amount", newAmount], t4, type$.int), null);
+              t3 = $.$get$backendUrl();
+              t4 = A.S($name);
+              t5 = type$.String;
+              t6 = B.C_JsonCodec.encode$2$toEncodable(A.LinkedHashMap_LinkedHashMap$_literal(["amount", newAmount], t5, type$.int), null);
               $async$goto = 8;
-              return A._asyncAwait(A.HttpRequest_request(string$.https__ + t3, "PUT", null, A.LinkedHashMap_LinkedHashMap$_literal(["Content-Type", "application/json"], t4, t4), t5, null), $async$call$1);
+              return A._asyncAwait(A.HttpRequest_request(A.S(t3) + "/items/" + t4, "PUT", null, A.LinkedHashMap_LinkedHashMap$_literal(["Content-Type", "application/json"], t5, t5), t6, null), $async$call$1);
             case 8:
               // returning from await.
               B.InputElement_methods.set$value(t1, "");
@@ -6194,7 +8171,7 @@
               // then
               $async$handler = 5;
               $async$goto = 8;
-              return A._asyncAwait(A.HttpRequest_request(string$.https__ + A.S($name), "DELETE", null, null, null, null), $async$call$1);
+              return A._asyncAwait(A.HttpRequest_request(A.S($.$get$backendUrl()) + "/items/" + A.S($name), "DELETE", null, null, null, null), $async$call$1);
             case 8:
               // returning from await.
               B.InputElement_methods.set$value(t1, "");
@@ -6241,7 +8218,7 @@
     call$1(item) {
       return type$.Map_String_dynamic._as(item);
     },
-    $signature: 20
+    $signature: 26
   };
   (function aliases() {
     var _ = J.Interceptor.prototype;
@@ -6257,7 +8234,7 @@
     _static_1(A, "async__AsyncRun__scheduleImmediateWithSetImmediate$closure", "_AsyncRun__scheduleImmediateWithSetImmediate", 2);
     _static_1(A, "async__AsyncRun__scheduleImmediateWithTimer$closure", "_AsyncRun__scheduleImmediateWithTimer", 2);
     _static_0(A, "async___startMicrotaskLoop$closure", "_startMicrotaskLoop", 0);
-    _instance(A._Completer.prototype, "get$completeError", 0, 1, null, ["call$2", "call$1"], ["completeError$2", "completeError$1"], 13, 0, 0);
+    _instance(A._Completer.prototype, "get$completeError", 0, 1, null, ["call$2", "call$1"], ["completeError$2", "completeError$1"], 14, 0, 0);
     _static_1(A, "convert___defaultToEncodable$closure", "_defaultToEncodable", 3);
   })();
   (function inheritance() {
@@ -6265,9 +8242,9 @@
       _inherit = hunkHelpers.inherit,
       _inheritMany = hunkHelpers.inheritMany;
     _inherit(A.Object, null);
-    _inheritMany(A.Object, [A.JS_CONST, J.Interceptor, J.ArrayIterator, A.Error, A.Iterable, A.ListIterator, A.TypeErrorDecoder, A.NullThrownFromJavaScriptException, A.ExceptionAndStackTrace, A._StackTrace, A.Closure, A.MapBase, A.LinkedHashMapCell, A.LinkedHashMapKeyIterator, A.Rti, A._FunctionParameters, A._Type, A._TimerImpl, A._AsyncAwaitCompleter, A.AsyncError, A._Completer, A._FutureListener, A._Future, A._AsyncCallbackEntry, A.Stream, A._StreamIterator, A._Zone, A.ListBase, A.Codec, A.Converter, A._JsonStringifier, A.StackOverflowError, A._Exception, A.FormatException, A.Null, A._StringStackTrace, A.StringBuffer, A.EventStreamProvider, A._EventStreamSubscription, A.ImmutableListMixin, A.FixedSizeListIterator]);
+    _inheritMany(A.Object, [A.JS_CONST, J.Interceptor, J.ArrayIterator, A.Error, A.Iterable, A.ListIterator, A.FixedLengthListMixin, A.TypeErrorDecoder, A.NullThrownFromJavaScriptException, A.ExceptionAndStackTrace, A._StackTrace, A.Closure, A.MapBase, A.LinkedHashMapCell, A.LinkedHashMapKeyIterator, A.JSSyntaxRegExp, A._MatchImplementation, A.StringMatch, A._StringAllMatchesIterator, A.Rti, A._FunctionParameters, A._Type, A._TimerImpl, A._AsyncAwaitCompleter, A.AsyncError, A._Completer, A._FutureListener, A._Future, A._AsyncCallbackEntry, A.Stream, A._StreamIterator, A._Zone, A.ListBase, A.Codec, A.Converter, A._JsonStringifier, A.OutOfMemoryError, A.StackOverflowError, A._Exception, A.FormatException, A.Null, A._StringStackTrace, A.StringBuffer, A._Uri, A.UriData, A._SimpleUri, A.EventStreamProvider, A._EventStreamSubscription, A.ImmutableListMixin, A.FixedSizeListIterator]);
     _inheritMany(J.Interceptor, [J.JSBool, J.JSNull, J.JavaScriptObject, J.JavaScriptBigInt, J.JavaScriptSymbol, J.JSNumber, J.JSString]);
-    _inheritMany(J.JavaScriptObject, [J.LegacyJavaScriptObject, J.JSArray, A.EventTarget, A.DomException, A.Event, A._HtmlCollection_JavaScriptObject_ListMixin]);
+    _inheritMany(J.JavaScriptObject, [J.LegacyJavaScriptObject, J.JSArray, A.NativeTypedData, A.EventTarget, A.DomException, A.Event, A._HtmlCollection_JavaScriptObject_ListMixin]);
     _inheritMany(J.LegacyJavaScriptObject, [J.PlainJavaScriptObject, J.UnknownJavaScriptObject, J.JavaScriptFunction]);
     _inherit(J.JSUnmodifiableArray, J.JSArray);
     _inheritMany(J.JSNumber, [J.JSInt, J.JSNumNotInt]);
@@ -6276,19 +8253,25 @@
     _inheritMany(A.EfficientLengthIterable, [A.ListIterable, A.LinkedHashMapKeyIterable]);
     _inheritMany(A.ListIterable, [A.MappedListIterable, A._JsonMapKeyIterable]);
     _inherit(A.NullError, A.TypeError);
-    _inheritMany(A.Closure, [A.Closure0Args, A.Closure2Args, A.TearOffClosure, A.initHooks_closure, A.initHooks_closure1, A._AsyncRun__initializeScheduleImmediate_internalCallback, A._AsyncRun__initializeScheduleImmediate_closure, A._awaitOnObject_closure, A._Future__chainForeignFuture_closure, A._Future__propagateToListeners_handleWhenCompleteCallback_closure, A.Stream_length_closure, A._RootZone_bindUnaryCallbackGuarded_closure, A.HttpRequest_getString_closure, A.HttpRequest_request_closure0, A._EventStreamSubscription_closure, A.main_closure, A.main_closure0, A.main_closure1, A.loadItems_closure]);
+    _inheritMany(A.Closure, [A.Closure0Args, A.Closure2Args, A.TearOffClosure, A.initHooks_closure, A.initHooks_closure1, A._AsyncRun__initializeScheduleImmediate_internalCallback, A._AsyncRun__initializeScheduleImmediate_closure, A._awaitOnObject_closure, A._Future__chainForeignFuture_closure, A._Future__propagateToListeners_handleWhenCompleteCallback_closure, A.Stream_length_closure, A._RootZone_bindUnaryCallbackGuarded_closure, A._createTables_setChars, A._createTables_setRange, A.HttpRequest_getString_closure, A.HttpRequest_request_closure0, A._EventStreamSubscription_closure, A.main_closure, A.main_closure0, A.main_closure1, A.loadItems_closure]);
     _inheritMany(A.TearOffClosure, [A.StaticClosure, A.BoundClosure]);
     _inheritMany(A.MapBase, [A.JsLinkedHashMap, A._JsonMap]);
-    _inheritMany(A.Closure2Args, [A.initHooks_closure0, A._awaitOnObject_closure0, A._wrapJsFunctionForAsync_closure, A._Future__chainForeignFuture_closure0, A.MapBase_mapToString_closure, A._JsonStringifier_writeMap_closure, A.HttpRequest_request_closure]);
+    _inheritMany(A.Closure2Args, [A.initHooks_closure0, A._awaitOnObject_closure0, A._wrapJsFunctionForAsync_closure, A._Future__chainForeignFuture_closure0, A.MapBase_mapToString_closure, A._JsonStringifier_writeMap_closure, A.Uri__parseIPv4Address_error, A.Uri_parseIPv6Address_error, A.Uri_parseIPv6Address_parseHex, A._createTables_build, A.HttpRequest_request_closure]);
+    _inherit(A.NativeTypedArray, A.NativeTypedData);
+    _inherit(A._NativeTypedArrayOfInt_NativeTypedArray_ListMixin, A.NativeTypedArray);
+    _inherit(A._NativeTypedArrayOfInt_NativeTypedArray_ListMixin_FixedLengthListMixin, A._NativeTypedArrayOfInt_NativeTypedArray_ListMixin);
+    _inherit(A.NativeTypedArrayOfInt, A._NativeTypedArrayOfInt_NativeTypedArray_ListMixin_FixedLengthListMixin);
+    _inheritMany(A.NativeTypedArrayOfInt, [A.NativeInt8List, A.NativeUint8List]);
     _inherit(A._TypeError, A._Error);
-    _inheritMany(A.Closure0Args, [A._AsyncRun__scheduleImmediateJsOverride_internalCallback, A._AsyncRun__scheduleImmediateWithSetImmediate_internalCallback, A._TimerImpl_internalCallback, A._Future__addListener_closure, A._Future__prependListeners_closure, A._Future__chainForeignFuture_closure1, A._Future__chainCoreFutureAsync_closure, A._Future__asyncCompleteWithValue_closure, A._Future__asyncCompleteError_closure, A._Future__propagateToListeners_handleWhenCompleteCallback, A._Future__propagateToListeners_handleValueCallback, A._Future__propagateToListeners_handleError, A.Stream_length_closure0, A._rootHandleError_closure, A._RootZone_bindCallbackGuarded_closure]);
+    _inheritMany(A.Closure0Args, [A._AsyncRun__scheduleImmediateJsOverride_internalCallback, A._AsyncRun__scheduleImmediateWithSetImmediate_internalCallback, A._TimerImpl_internalCallback, A._Future__addListener_closure, A._Future__prependListeners_closure, A._Future__chainForeignFuture_closure1, A._Future__chainCoreFutureAsync_closure, A._Future__asyncCompleteWithValue_closure, A._Future__asyncCompleteError_closure, A._Future__propagateToListeners_handleWhenCompleteCallback, A._Future__propagateToListeners_handleValueCallback, A._Future__propagateToListeners_handleError, A.Stream_length_closure0, A._rootHandleError_closure, A._RootZone_bindCallbackGuarded_closure, A.backendUrl_closure]);
     _inherit(A._AsyncCompleter, A._Completer);
     _inherit(A._RootZone, A._Zone);
+    _inheritMany(A.Codec, [A.Base64Codec, A.JsonCodec]);
+    _inheritMany(A.Converter, [A.Base64Encoder, A.JsonEncoder, A.JsonDecoder]);
     _inherit(A.JsonCyclicError, A.JsonUnsupportedObjectError);
-    _inherit(A.JsonCodec, A.Codec);
-    _inheritMany(A.Converter, [A.JsonEncoder, A.JsonDecoder]);
     _inherit(A._JsonStringStringifier, A._JsonStringifier);
     _inheritMany(A.ArgumentError, [A.RangeError, A.IndexError]);
+    _inherit(A._DataUri, A._Uri);
     _inheritMany(A.EventTarget, [A.Node, A.HttpRequestEventTarget, A.Window]);
     _inheritMany(A.Node, [A.Element, A.CharacterData]);
     _inherit(A.HtmlElement, A.Element);
@@ -6300,6 +8283,8 @@
     _inherit(A.MouseEvent, A.UIEvent);
     _inherit(A._EventStream, A.Stream);
     _inherit(A._ElementEventStreamImpl, A._EventStream);
+    _mixin(A._NativeTypedArrayOfInt_NativeTypedArray_ListMixin, A.ListBase);
+    _mixin(A._NativeTypedArrayOfInt_NativeTypedArray_ListMixin_FixedLengthListMixin, A.FixedLengthListMixin);
     _mixin(A._HtmlCollection_JavaScriptObject_ListMixin, A.ListBase);
     _mixin(A._HtmlCollection_JavaScriptObject_ListMixin_ImmutableListMixin, A.ImmutableListMixin);
   })();
@@ -6307,17 +8292,15 @@
     typeUniverse: {eC: new Map(), tR: {}, eT: {}, tPV: {}, sEA: []},
     mangledGlobalNames: {int: "int", double: "double", num: "num", String: "String", bool: "bool", Null: "Null", List: "List", Object: "Object", Map: "Map"},
     mangledNames: {},
-    types: ["~()", "Future<~>(MouseEvent)", "~(~())", "@(@)", "Null(@)", "Null()", "~(Object?,Object?)", "@(@,String)", "@(String)", "Null(~())", "~(@)", "Null(@,StackTrace)", "~(int,@)", "~(Object[StackTrace?])", "Null(Object,StackTrace)", "_Future<@>(@)", "String(HttpRequest)", "~(String,String)", "~(ProgressEvent)", "~(Event)", "Map<String,@>(@)"],
+    types: ["~()", "Future<~>(MouseEvent)", "~(~())", "@(@)", "Null(@)", "Null()", "~(Object?,Object?)", "~(Uint8List,String,int)", "@(@,String)", "@(String)", "Null(~())", "~(@)", "Null(@,StackTrace)", "~(int,@)", "~(Object[StackTrace?])", "Null(Object,StackTrace)", "_Future<@>(@)", "~(String,int)", "~(String,int?)", "int(int,int)", "Uint8List(@,@)", "String(HttpRequest)", "~(String,String)", "~(ProgressEvent)", "~(Event)", "String?()", "Map<String,@>(@)"],
     interceptorsByTag: null,
     leafTags: null,
     arrayRti: Symbol("$ti")
   };
-  A._Universe_addRules(init.typeUniverse, JSON.parse('{"PlainJavaScriptObject":"LegacyJavaScriptObject","UnknownJavaScriptObject":"LegacyJavaScriptObject","JavaScriptFunction":"LegacyJavaScriptObject","AbortPaymentEvent":"Event","ExtendableEvent":"Event","MathMLElement":"Element","_ResourceProgressEvent":"ProgressEvent","AudioElement":"HtmlElement","MediaElement":"HtmlElement","HtmlDocument":"Node","Document":"Node","PointerEvent":"MouseEvent","CompositionEvent":"UIEvent","CDataSection":"CharacterData","Text":"CharacterData","HtmlFormControlsCollection":"HtmlCollection","JSBool":{"bool":[],"TrustedGetRuntimeType":[]},"JSNull":{"Null":[],"TrustedGetRuntimeType":[]},"JSArray":{"List":["1"],"Iterable":["1"]},"JSUnmodifiableArray":{"JSArray":["1"],"List":["1"],"Iterable":["1"]},"JSNumber":{"num":[]},"JSInt":{"int":[],"num":[],"TrustedGetRuntimeType":[]},"JSNumNotInt":{"num":[],"TrustedGetRuntimeType":[]},"JSString":{"String":[],"TrustedGetRuntimeType":[]},"LateError":{"Error":[]},"EfficientLengthIterable":{"Iterable":["1"]},"ListIterable":{"Iterable":["1"]},"MappedListIterable":{"ListIterable":["2"],"Iterable":["2"],"ListIterable.E":"2"},"NullError":{"TypeError":[],"Error":[]},"JsNoSuchMethodError":{"Error":[]},"UnknownJsTypeError":{"Error":[]},"_StackTrace":{"StackTrace":[]},"Closure":{"Function":[]},"Closure0Args":{"Function":[]},"Closure2Args":{"Function":[]},"TearOffClosure":{"Function":[]},"StaticClosure":{"Function":[]},"BoundClosure":{"Function":[]},"_CyclicInitializationError":{"Error":[]},"RuntimeError":{"Error":[]},"JsLinkedHashMap":{"MapBase":["1","2"],"LinkedHashMap":["1","2"],"Map":["1","2"],"MapBase.K":"1","MapBase.V":"2"},"LinkedHashMapKeyIterable":{"Iterable":["1"]},"_Error":{"Error":[]},"_TypeError":{"TypeError":[],"Error":[]},"_Future":{"Future":["1"]},"AsyncError":{"Error":[]},"_AsyncCompleter":{"_Completer":["1"]},"_Zone":{"Zone":[]},"_RootZone":{"_Zone":[],"Zone":[]},"MapBase":{"Map":["1","2"]},"_JsonMap":{"MapBase":["String","@"],"Map":["String","@"],"MapBase.K":"String","MapBase.V":"@"},"_JsonMapKeyIterable":{"ListIterable":["String"],"Iterable":["String"],"ListIterable.E":"String"},"JsonUnsupportedObjectError":{"Error":[]},"JsonCyclicError":{"Error":[]},"int":{"num":[]},"AssertionError":{"Error":[]},"TypeError":{"Error":[]},"ArgumentError":{"Error":[]},"RangeError":{"Error":[]},"IndexError":{"Error":[]},"UnsupportedError":{"Error":[]},"UnimplementedError":{"Error":[]},"StateError":{"Error":[]},"ConcurrentModificationError":{"Error":[]},"StackOverflowError":{"Error":[]},"_StringStackTrace":{"StackTrace":[]},"StringBuffer":{"StringSink":[]},"HttpRequest":{"EventTarget":[]},"MouseEvent":{"Event":[]},"Node":{"EventTarget":[]},"ProgressEvent":{"Event":[]},"HtmlElement":{"Element":[],"Node":[],"EventTarget":[]},"AnchorElement":{"Element":[],"Node":[],"EventTarget":[]},"AreaElement":{"Element":[],"Node":[],"EventTarget":[]},"ButtonElement":{"Element":[],"Node":[],"EventTarget":[]},"CharacterData":{"Node":[],"EventTarget":[]},"Element":{"Node":[],"EventTarget":[]},"FormElement":{"Element":[],"Node":[],"EventTarget":[]},"HtmlCollection":{"ListBase":["Node"],"ImmutableListMixin":["Node"],"List":["Node"],"JavaScriptIndexingBehavior":["Node"],"Iterable":["Node"],"ListBase.E":"Node","ImmutableListMixin.E":"Node"},"HttpRequestEventTarget":{"EventTarget":[]},"InputElement":{"Element":[],"Node":[],"EventTarget":[]},"SelectElement":{"Element":[],"Node":[],"EventTarget":[]},"TableCellElement":{"Element":[],"Node":[],"EventTarget":[]},"TableSectionElement":{"Element":[],"Node":[],"EventTarget":[]},"UIEvent":{"Event":[]},"Window":{"EventTarget":[]},"_EventStream":{"Stream":["1"]},"_ElementEventStreamImpl":{"_EventStream":["1"],"Stream":["1"]},"_EventStreamSubscription":{"StreamSubscription":["1"]}}'));
-  A._Universe_addErasedTypes(init.typeUniverse, JSON.parse('{"EfficientLengthIterable":1,"Codec":2,"Converter":2}'));
+  A._Universe_addRules(init.typeUniverse, JSON.parse('{"PlainJavaScriptObject":"LegacyJavaScriptObject","UnknownJavaScriptObject":"LegacyJavaScriptObject","JavaScriptFunction":"LegacyJavaScriptObject","AbortPaymentEvent":"Event","ExtendableEvent":"Event","MathMLElement":"Element","_ResourceProgressEvent":"ProgressEvent","AudioElement":"HtmlElement","MediaElement":"HtmlElement","HtmlDocument":"Node","Document":"Node","PointerEvent":"MouseEvent","CompositionEvent":"UIEvent","CDataSection":"CharacterData","Text":"CharacterData","HtmlFormControlsCollection":"HtmlCollection","JSBool":{"bool":[],"TrustedGetRuntimeType":[]},"JSNull":{"Null":[],"TrustedGetRuntimeType":[]},"JSArray":{"List":["1"],"Iterable":["1"]},"JSUnmodifiableArray":{"JSArray":["1"],"List":["1"],"Iterable":["1"]},"JSNumber":{"num":[]},"JSInt":{"int":[],"num":[],"TrustedGetRuntimeType":[]},"JSNumNotInt":{"num":[],"TrustedGetRuntimeType":[]},"JSString":{"String":[],"Pattern":[],"TrustedGetRuntimeType":[]},"LateError":{"Error":[]},"EfficientLengthIterable":{"Iterable":["1"]},"ListIterable":{"Iterable":["1"]},"MappedListIterable":{"ListIterable":["2"],"Iterable":["2"],"ListIterable.E":"2"},"NullError":{"TypeError":[],"Error":[]},"JsNoSuchMethodError":{"Error":[]},"UnknownJsTypeError":{"Error":[]},"_StackTrace":{"StackTrace":[]},"Closure":{"Function":[]},"Closure0Args":{"Function":[]},"Closure2Args":{"Function":[]},"TearOffClosure":{"Function":[]},"StaticClosure":{"Function":[]},"BoundClosure":{"Function":[]},"_CyclicInitializationError":{"Error":[]},"RuntimeError":{"Error":[]},"JsLinkedHashMap":{"MapBase":["1","2"],"LinkedHashMap":["1","2"],"Map":["1","2"],"MapBase.K":"1","MapBase.V":"2"},"LinkedHashMapKeyIterable":{"Iterable":["1"]},"JSSyntaxRegExp":{"RegExp":[],"Pattern":[]},"_MatchImplementation":{"Match":[]},"StringMatch":{"Match":[]},"NativeTypedArray":{"JavaScriptIndexingBehavior":["1"]},"NativeTypedArrayOfInt":{"ListBase":["int"],"List":["int"],"JavaScriptIndexingBehavior":["int"],"Iterable":["int"],"FixedLengthListMixin":["int"]},"NativeInt8List":{"ListBase":["int"],"List":["int"],"JavaScriptIndexingBehavior":["int"],"Iterable":["int"],"FixedLengthListMixin":["int"],"TrustedGetRuntimeType":[],"ListBase.E":"int"},"NativeUint8List":{"Uint8List":[],"ListBase":["int"],"List":["int"],"JavaScriptIndexingBehavior":["int"],"Iterable":["int"],"FixedLengthListMixin":["int"],"TrustedGetRuntimeType":[],"ListBase.E":"int"},"_Error":{"Error":[]},"_TypeError":{"TypeError":[],"Error":[]},"_Future":{"Future":["1"]},"AsyncError":{"Error":[]},"_AsyncCompleter":{"_Completer":["1"]},"_Zone":{"Zone":[]},"_RootZone":{"_Zone":[],"Zone":[]},"MapBase":{"Map":["1","2"]},"_JsonMap":{"MapBase":["String","@"],"Map":["String","@"],"MapBase.K":"String","MapBase.V":"@"},"_JsonMapKeyIterable":{"ListIterable":["String"],"Iterable":["String"],"ListIterable.E":"String"},"Base64Codec":{"Codec":["List<int>","String"]},"JsonUnsupportedObjectError":{"Error":[]},"JsonCyclicError":{"Error":[]},"JsonCodec":{"Codec":["Object?","String"]},"int":{"num":[]},"List":{"Iterable":["1"]},"String":{"Pattern":[]},"AssertionError":{"Error":[]},"TypeError":{"Error":[]},"ArgumentError":{"Error":[]},"RangeError":{"Error":[]},"IndexError":{"Error":[]},"UnsupportedError":{"Error":[]},"UnimplementedError":{"Error":[]},"StateError":{"Error":[]},"ConcurrentModificationError":{"Error":[]},"OutOfMemoryError":{"Error":[]},"StackOverflowError":{"Error":[]},"_StringStackTrace":{"StackTrace":[]},"StringBuffer":{"StringSink":[]},"_Uri":{"Uri":[]},"_SimpleUri":{"Uri":[]},"_DataUri":{"Uri":[]},"HttpRequest":{"EventTarget":[]},"MouseEvent":{"Event":[]},"Node":{"EventTarget":[]},"ProgressEvent":{"Event":[]},"HtmlElement":{"Element":[],"Node":[],"EventTarget":[]},"AnchorElement":{"Element":[],"Node":[],"EventTarget":[]},"AreaElement":{"Element":[],"Node":[],"EventTarget":[]},"ButtonElement":{"Element":[],"Node":[],"EventTarget":[]},"CharacterData":{"Node":[],"EventTarget":[]},"Element":{"Node":[],"EventTarget":[]},"FormElement":{"Element":[],"Node":[],"EventTarget":[]},"HtmlCollection":{"ListBase":["Node"],"ImmutableListMixin":["Node"],"List":["Node"],"JavaScriptIndexingBehavior":["Node"],"Iterable":["Node"],"ImmutableListMixin.E":"Node","ListBase.E":"Node"},"HttpRequestEventTarget":{"EventTarget":[]},"InputElement":{"Element":[],"Node":[],"EventTarget":[]},"SelectElement":{"Element":[],"Node":[],"EventTarget":[]},"TableCellElement":{"Element":[],"Node":[],"EventTarget":[]},"TableSectionElement":{"Element":[],"Node":[],"EventTarget":[]},"UIEvent":{"Event":[]},"Window":{"EventTarget":[]},"_EventStream":{"Stream":["1"]},"_ElementEventStreamImpl":{"_EventStream":["1"],"Stream":["1"]},"_EventStreamSubscription":{"StreamSubscription":["1"]},"Int8List":{"List":["int"],"Iterable":["int"]},"Uint8List":{"List":["int"],"Iterable":["int"]}}'));
+  A._Universe_addErasedTypes(init.typeUniverse, JSON.parse('{"EfficientLengthIterable":1,"NativeTypedArray":1,"Converter":2}'));
   var string$ = {
-    Error_: "Error handler must accept one Object or one Object and a StackTrace as arguments, and return a value of the returned future's type",
-    https_: "https://glowing-memory-q5jx4v9pqgp24wr9-8080.app.github.dev/items",
-    https__: "https://glowing-memory-q5jx4v9pqgp24wr9-8080.app.github.dev/items/"
+    Error_: "Error handler must accept one Object or one Object and a StackTrace as arguments, and return a value of the returned future's type"
   };
   var type$ = (function rtii() {
     var findType = A.findType;
@@ -6333,13 +8316,16 @@
       Iterable_dynamic: findType("Iterable<@>"),
       JSArray_Map_String_dynamic: findType("JSArray<Map<String,@>>"),
       JSArray_String: findType("JSArray<String>"),
+      JSArray_Uint8List: findType("JSArray<Uint8List>"),
       JSArray_dynamic: findType("JSArray<@>"),
+      JSArray_int: findType("JSArray<int>"),
       JSNull: findType("JSNull"),
       JavaScriptFunction: findType("JavaScriptFunction"),
       JavaScriptIndexingBehavior_dynamic: findType("JavaScriptIndexingBehavior<@>"),
       List_dynamic: findType("List<@>"),
       Map_String_dynamic: findType("Map<String,@>"),
       MouseEvent: findType("MouseEvent"),
+      Node: findType("Node"),
       Null: findType("Null"),
       Object: findType("Object"),
       ProgressEvent: findType("ProgressEvent"),
@@ -6350,6 +8336,7 @@
       TrustedGetRuntimeType: findType("TrustedGetRuntimeType"),
       TypeError: findType("TypeError"),
       UnknownJavaScriptObject: findType("UnknownJavaScriptObject"),
+      Uri: findType("Uri"),
       _AsyncCompleter_HttpRequest: findType("_AsyncCompleter<HttpRequest>"),
       _ElementEventStreamImpl_MouseEvent: findType("_ElementEventStreamImpl<MouseEvent>"),
       _Future_HttpRequest: findType("_Future<HttpRequest>"),
@@ -6379,6 +8366,7 @@
     };
   })();
   (function constants() {
+    var makeConstList = hunkHelpers.makeConstList;
     B.HttpRequest_methods = A.HttpRequest.prototype;
     B.InputElement_methods = A.InputElement.prototype;
     B.Interceptor_methods = J.Interceptor.prototype;
@@ -6388,11 +8376,14 @@
     B.JSString_methods = J.JSString.prototype;
     B.JavaScriptFunction_methods = J.JavaScriptFunction.prototype;
     B.JavaScriptObject_methods = J.JavaScriptObject.prototype;
+    B.NativeUint8List_methods = A.NativeUint8List.prototype;
     B.PlainJavaScriptObject_methods = J.PlainJavaScriptObject.prototype;
     B.TableCellElement_methods = A.TableCellElement.prototype;
     B.TableSectionElement_methods = A.TableSectionElement.prototype;
     B.UnknownJavaScriptObject_methods = J.UnknownJavaScriptObject.prototype;
     B.Window_methods = A.Window.prototype;
+    B.C_Base64Encoder = new A.Base64Encoder();
+    B.C_Base64Codec = new A.Base64Codec();
     B.C_JS_CONST = function getTagFallback(o) {
   var s = Object.prototype.toString.call(o);
   return s.substring(8, s.length - 1);
@@ -6519,10 +8510,20 @@
     B.C_JS_CONST3 = function(hooks) { return hooks; }
 ;
     B.C_JsonCodec = new A.JsonCodec();
+    B.C_OutOfMemoryError = new A.OutOfMemoryError();
     B.C__RootZone = new A._RootZone();
     B.C__StringStackTrace = new A._StringStackTrace();
     B.JsonDecoder_null = new A.JsonDecoder(null);
     B.JsonEncoder_null = new A.JsonEncoder(null);
+    B.List_2jN = A._setArrayType(makeConstList([0, 0, 32722, 12287, 65534, 34815, 65534, 18431]), type$.JSArray_int);
+    B.List_42A = A._setArrayType(makeConstList([0, 0, 65490, 45055, 65535, 34815, 65534, 18431]), type$.JSArray_int);
+    B.List_4AN = A._setArrayType(makeConstList([0, 0, 32754, 11263, 65534, 34815, 65534, 18431]), type$.JSArray_int);
+    B.List_GVy = A._setArrayType(makeConstList([0, 0, 26624, 1023, 65534, 2047, 65534, 2047]), type$.JSArray_int);
+    B.List_M2I = A._setArrayType(makeConstList([0, 0, 65490, 12287, 65535, 34815, 65534, 18431]), type$.JSArray_int);
+    B.List_VOY = A._setArrayType(makeConstList([0, 0, 32776, 33792, 1, 10240, 0, 0]), type$.JSArray_int);
+    B.List_piR = A._setArrayType(makeConstList([0, 0, 24576, 1023, 65534, 34815, 65534, 18431]), type$.JSArray_int);
+    B.Type_Int8List_woc = A.typeLiteral("Int8List");
+    B.Type_Uint8List_CSc = A.typeLiteral("Uint8List");
   })();
   (function staticFields() {
     $._JS_INTEROP_INTERCEPTOR_TAG = null;
@@ -6541,6 +8542,8 @@
     $._lastPriorityCallback = null;
     $._isInCallbackLoop = false;
     $.Zone__current = B.C__RootZone;
+    $.Uri__cachedBaseString = "";
+    $.Uri__cachedBaseUri = null;
   })();
   (function lazyInitializers() {
     var _lazyFinal = hunkHelpers.lazyFinal;
@@ -6590,6 +8593,9 @@
       }
     }()));
     _lazyFinal($, "_AsyncRun__scheduleImmediateClosure", "$get$_AsyncRun__scheduleImmediateClosure", () => A._AsyncRun__initializeScheduleImmediate());
+    _lazyFinal($, "_Base64Decoder__inverseAlphabet", "$get$_Base64Decoder__inverseAlphabet", () => new Int8Array(A._ensureNativeList(A._setArrayType([-2, -2, -2, -2, -2, -2, -2, -2, -2, -2, -2, -2, -2, -2, -2, -2, -2, -2, -2, -2, -2, -2, -2, -2, -2, -2, -2, -2, -2, -2, -2, -2, -2, -2, -2, -2, -2, -1, -2, -2, -2, -2, -2, 62, -2, 62, -2, 63, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, -2, -2, -2, -1, -2, -2, -2, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, -2, -2, -2, -2, 63, -2, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, -2, -2, -2, -2, -2], type$.JSArray_int))));
+    _lazyFinal($, "_scannerTables", "$get$_scannerTables", () => A._createTables());
+    _lazyFinal($, "backendUrl", "$get$backendUrl", () => new A.backendUrl_closure().call$0());
   })();
   (function nativeSupport() {
     !function() {
@@ -6614,8 +8620,12 @@
       }
       init.dispatchPropertyName = init.getIsolateTag("dispatch_record");
     }();
-    hunkHelpers.setOrUpdateInterceptorsByTag({DOMError: J.JavaScriptObject, MediaError: J.JavaScriptObject, NavigatorUserMediaError: J.JavaScriptObject, OverconstrainedError: J.JavaScriptObject, PositionError: J.JavaScriptObject, GeolocationPositionError: J.JavaScriptObject, HTMLAudioElement: A.HtmlElement, HTMLBRElement: A.HtmlElement, HTMLBaseElement: A.HtmlElement, HTMLBodyElement: A.HtmlElement, HTMLCanvasElement: A.HtmlElement, HTMLContentElement: A.HtmlElement, HTMLDListElement: A.HtmlElement, HTMLDataElement: A.HtmlElement, HTMLDataListElement: A.HtmlElement, HTMLDetailsElement: A.HtmlElement, HTMLDialogElement: A.HtmlElement, HTMLDivElement: A.HtmlElement, HTMLEmbedElement: A.HtmlElement, HTMLFieldSetElement: A.HtmlElement, HTMLHRElement: A.HtmlElement, HTMLHeadElement: A.HtmlElement, HTMLHeadingElement: A.HtmlElement, HTMLHtmlElement: A.HtmlElement, HTMLIFrameElement: A.HtmlElement, HTMLImageElement: A.HtmlElement, HTMLLIElement: A.HtmlElement, HTMLLabelElement: A.HtmlElement, HTMLLegendElement: A.HtmlElement, HTMLLinkElement: A.HtmlElement, HTMLMapElement: A.HtmlElement, HTMLMediaElement: A.HtmlElement, HTMLMenuElement: A.HtmlElement, HTMLMetaElement: A.HtmlElement, HTMLMeterElement: A.HtmlElement, HTMLModElement: A.HtmlElement, HTMLOListElement: A.HtmlElement, HTMLObjectElement: A.HtmlElement, HTMLOptGroupElement: A.HtmlElement, HTMLOptionElement: A.HtmlElement, HTMLOutputElement: A.HtmlElement, HTMLParagraphElement: A.HtmlElement, HTMLParamElement: A.HtmlElement, HTMLPictureElement: A.HtmlElement, HTMLPreElement: A.HtmlElement, HTMLProgressElement: A.HtmlElement, HTMLQuoteElement: A.HtmlElement, HTMLScriptElement: A.HtmlElement, HTMLShadowElement: A.HtmlElement, HTMLSlotElement: A.HtmlElement, HTMLSourceElement: A.HtmlElement, HTMLSpanElement: A.HtmlElement, HTMLStyleElement: A.HtmlElement, HTMLTableCaptionElement: A.HtmlElement, HTMLTableColElement: A.HtmlElement, HTMLTableElement: A.HtmlElement, HTMLTableRowElement: A.HtmlElement, HTMLTemplateElement: A.HtmlElement, HTMLTextAreaElement: A.HtmlElement, HTMLTimeElement: A.HtmlElement, HTMLTitleElement: A.HtmlElement, HTMLTrackElement: A.HtmlElement, HTMLUListElement: A.HtmlElement, HTMLUnknownElement: A.HtmlElement, HTMLVideoElement: A.HtmlElement, HTMLDirectoryElement: A.HtmlElement, HTMLFontElement: A.HtmlElement, HTMLFrameElement: A.HtmlElement, HTMLFrameSetElement: A.HtmlElement, HTMLMarqueeElement: A.HtmlElement, HTMLElement: A.HtmlElement, HTMLAnchorElement: A.AnchorElement, HTMLAreaElement: A.AreaElement, HTMLButtonElement: A.ButtonElement, CDATASection: A.CharacterData, CharacterData: A.CharacterData, Comment: A.CharacterData, ProcessingInstruction: A.CharacterData, Text: A.CharacterData, DOMException: A.DomException, MathMLElement: A.Element, SVGAElement: A.Element, SVGAnimateElement: A.Element, SVGAnimateMotionElement: A.Element, SVGAnimateTransformElement: A.Element, SVGAnimationElement: A.Element, SVGCircleElement: A.Element, SVGClipPathElement: A.Element, SVGDefsElement: A.Element, SVGDescElement: A.Element, SVGDiscardElement: A.Element, SVGEllipseElement: A.Element, SVGFEBlendElement: A.Element, SVGFEColorMatrixElement: A.Element, SVGFEComponentTransferElement: A.Element, SVGFECompositeElement: A.Element, SVGFEConvolveMatrixElement: A.Element, SVGFEDiffuseLightingElement: A.Element, SVGFEDisplacementMapElement: A.Element, SVGFEDistantLightElement: A.Element, SVGFEFloodElement: A.Element, SVGFEFuncAElement: A.Element, SVGFEFuncBElement: A.Element, SVGFEFuncGElement: A.Element, SVGFEFuncRElement: A.Element, SVGFEGaussianBlurElement: A.Element, SVGFEImageElement: A.Element, SVGFEMergeElement: A.Element, SVGFEMergeNodeElement: A.Element, SVGFEMorphologyElement: A.Element, SVGFEOffsetElement: A.Element, SVGFEPointLightElement: A.Element, SVGFESpecularLightingElement: A.Element, SVGFESpotLightElement: A.Element, SVGFETileElement: A.Element, SVGFETurbulenceElement: A.Element, SVGFilterElement: A.Element, SVGForeignObjectElement: A.Element, SVGGElement: A.Element, SVGGeometryElement: A.Element, SVGGraphicsElement: A.Element, SVGImageElement: A.Element, SVGLineElement: A.Element, SVGLinearGradientElement: A.Element, SVGMarkerElement: A.Element, SVGMaskElement: A.Element, SVGMetadataElement: A.Element, SVGPathElement: A.Element, SVGPatternElement: A.Element, SVGPolygonElement: A.Element, SVGPolylineElement: A.Element, SVGRadialGradientElement: A.Element, SVGRectElement: A.Element, SVGScriptElement: A.Element, SVGSetElement: A.Element, SVGStopElement: A.Element, SVGStyleElement: A.Element, SVGElement: A.Element, SVGSVGElement: A.Element, SVGSwitchElement: A.Element, SVGSymbolElement: A.Element, SVGTSpanElement: A.Element, SVGTextContentElement: A.Element, SVGTextElement: A.Element, SVGTextPathElement: A.Element, SVGTextPositioningElement: A.Element, SVGTitleElement: A.Element, SVGUseElement: A.Element, SVGViewElement: A.Element, SVGGradientElement: A.Element, SVGComponentTransferFunctionElement: A.Element, SVGFEDropShadowElement: A.Element, SVGMPathElement: A.Element, Element: A.Element, AbortPaymentEvent: A.Event, AnimationEvent: A.Event, AnimationPlaybackEvent: A.Event, ApplicationCacheErrorEvent: A.Event, BackgroundFetchClickEvent: A.Event, BackgroundFetchEvent: A.Event, BackgroundFetchFailEvent: A.Event, BackgroundFetchedEvent: A.Event, BeforeInstallPromptEvent: A.Event, BeforeUnloadEvent: A.Event, BlobEvent: A.Event, CanMakePaymentEvent: A.Event, ClipboardEvent: A.Event, CloseEvent: A.Event, CustomEvent: A.Event, DeviceMotionEvent: A.Event, DeviceOrientationEvent: A.Event, ErrorEvent: A.Event, ExtendableEvent: A.Event, ExtendableMessageEvent: A.Event, FetchEvent: A.Event, FontFaceSetLoadEvent: A.Event, ForeignFetchEvent: A.Event, GamepadEvent: A.Event, HashChangeEvent: A.Event, InstallEvent: A.Event, MediaEncryptedEvent: A.Event, MediaKeyMessageEvent: A.Event, MediaQueryListEvent: A.Event, MediaStreamEvent: A.Event, MediaStreamTrackEvent: A.Event, MessageEvent: A.Event, MIDIConnectionEvent: A.Event, MIDIMessageEvent: A.Event, MutationEvent: A.Event, NotificationEvent: A.Event, PageTransitionEvent: A.Event, PaymentRequestEvent: A.Event, PaymentRequestUpdateEvent: A.Event, PopStateEvent: A.Event, PresentationConnectionAvailableEvent: A.Event, PresentationConnectionCloseEvent: A.Event, PromiseRejectionEvent: A.Event, PushEvent: A.Event, RTCDataChannelEvent: A.Event, RTCDTMFToneChangeEvent: A.Event, RTCPeerConnectionIceEvent: A.Event, RTCTrackEvent: A.Event, SecurityPolicyViolationEvent: A.Event, SensorErrorEvent: A.Event, SpeechRecognitionError: A.Event, SpeechRecognitionEvent: A.Event, SpeechSynthesisEvent: A.Event, StorageEvent: A.Event, SyncEvent: A.Event, TrackEvent: A.Event, TransitionEvent: A.Event, WebKitTransitionEvent: A.Event, VRDeviceEvent: A.Event, VRDisplayEvent: A.Event, VRSessionEvent: A.Event, MojoInterfaceRequestEvent: A.Event, USBConnectionEvent: A.Event, IDBVersionChangeEvent: A.Event, AudioProcessingEvent: A.Event, OfflineAudioCompletionEvent: A.Event, WebGLContextEvent: A.Event, Event: A.Event, InputEvent: A.Event, SubmitEvent: A.Event, EventTarget: A.EventTarget, HTMLFormElement: A.FormElement, HTMLCollection: A.HtmlCollection, HTMLFormControlsCollection: A.HtmlCollection, HTMLOptionsCollection: A.HtmlCollection, XMLHttpRequest: A.HttpRequest, XMLHttpRequestEventTarget: A.HttpRequestEventTarget, HTMLInputElement: A.InputElement, MouseEvent: A.MouseEvent, DragEvent: A.MouseEvent, PointerEvent: A.MouseEvent, WheelEvent: A.MouseEvent, Document: A.Node, DocumentFragment: A.Node, HTMLDocument: A.Node, ShadowRoot: A.Node, XMLDocument: A.Node, Attr: A.Node, DocumentType: A.Node, Node: A.Node, ProgressEvent: A.ProgressEvent, ResourceProgressEvent: A.ProgressEvent, HTMLSelectElement: A.SelectElement, HTMLTableCellElement: A.TableCellElement, HTMLTableDataCellElement: A.TableCellElement, HTMLTableHeaderCellElement: A.TableCellElement, HTMLTableSectionElement: A.TableSectionElement, CompositionEvent: A.UIEvent, FocusEvent: A.UIEvent, KeyboardEvent: A.UIEvent, TextEvent: A.UIEvent, TouchEvent: A.UIEvent, UIEvent: A.UIEvent, Window: A.Window, DOMWindow: A.Window});
-    hunkHelpers.setOrUpdateLeafTags({DOMError: true, MediaError: true, NavigatorUserMediaError: true, OverconstrainedError: true, PositionError: true, GeolocationPositionError: true, HTMLAudioElement: true, HTMLBRElement: true, HTMLBaseElement: true, HTMLBodyElement: true, HTMLCanvasElement: true, HTMLContentElement: true, HTMLDListElement: true, HTMLDataElement: true, HTMLDataListElement: true, HTMLDetailsElement: true, HTMLDialogElement: true, HTMLDivElement: true, HTMLEmbedElement: true, HTMLFieldSetElement: true, HTMLHRElement: true, HTMLHeadElement: true, HTMLHeadingElement: true, HTMLHtmlElement: true, HTMLIFrameElement: true, HTMLImageElement: true, HTMLLIElement: true, HTMLLabelElement: true, HTMLLegendElement: true, HTMLLinkElement: true, HTMLMapElement: true, HTMLMediaElement: true, HTMLMenuElement: true, HTMLMetaElement: true, HTMLMeterElement: true, HTMLModElement: true, HTMLOListElement: true, HTMLObjectElement: true, HTMLOptGroupElement: true, HTMLOptionElement: true, HTMLOutputElement: true, HTMLParagraphElement: true, HTMLParamElement: true, HTMLPictureElement: true, HTMLPreElement: true, HTMLProgressElement: true, HTMLQuoteElement: true, HTMLScriptElement: true, HTMLShadowElement: true, HTMLSlotElement: true, HTMLSourceElement: true, HTMLSpanElement: true, HTMLStyleElement: true, HTMLTableCaptionElement: true, HTMLTableColElement: true, HTMLTableElement: true, HTMLTableRowElement: true, HTMLTemplateElement: true, HTMLTextAreaElement: true, HTMLTimeElement: true, HTMLTitleElement: true, HTMLTrackElement: true, HTMLUListElement: true, HTMLUnknownElement: true, HTMLVideoElement: true, HTMLDirectoryElement: true, HTMLFontElement: true, HTMLFrameElement: true, HTMLFrameSetElement: true, HTMLMarqueeElement: true, HTMLElement: false, HTMLAnchorElement: true, HTMLAreaElement: true, HTMLButtonElement: true, CDATASection: true, CharacterData: true, Comment: true, ProcessingInstruction: true, Text: true, DOMException: true, MathMLElement: true, SVGAElement: true, SVGAnimateElement: true, SVGAnimateMotionElement: true, SVGAnimateTransformElement: true, SVGAnimationElement: true, SVGCircleElement: true, SVGClipPathElement: true, SVGDefsElement: true, SVGDescElement: true, SVGDiscardElement: true, SVGEllipseElement: true, SVGFEBlendElement: true, SVGFEColorMatrixElement: true, SVGFEComponentTransferElement: true, SVGFECompositeElement: true, SVGFEConvolveMatrixElement: true, SVGFEDiffuseLightingElement: true, SVGFEDisplacementMapElement: true, SVGFEDistantLightElement: true, SVGFEFloodElement: true, SVGFEFuncAElement: true, SVGFEFuncBElement: true, SVGFEFuncGElement: true, SVGFEFuncRElement: true, SVGFEGaussianBlurElement: true, SVGFEImageElement: true, SVGFEMergeElement: true, SVGFEMergeNodeElement: true, SVGFEMorphologyElement: true, SVGFEOffsetElement: true, SVGFEPointLightElement: true, SVGFESpecularLightingElement: true, SVGFESpotLightElement: true, SVGFETileElement: true, SVGFETurbulenceElement: true, SVGFilterElement: true, SVGForeignObjectElement: true, SVGGElement: true, SVGGeometryElement: true, SVGGraphicsElement: true, SVGImageElement: true, SVGLineElement: true, SVGLinearGradientElement: true, SVGMarkerElement: true, SVGMaskElement: true, SVGMetadataElement: true, SVGPathElement: true, SVGPatternElement: true, SVGPolygonElement: true, SVGPolylineElement: true, SVGRadialGradientElement: true, SVGRectElement: true, SVGScriptElement: true, SVGSetElement: true, SVGStopElement: true, SVGStyleElement: true, SVGElement: true, SVGSVGElement: true, SVGSwitchElement: true, SVGSymbolElement: true, SVGTSpanElement: true, SVGTextContentElement: true, SVGTextElement: true, SVGTextPathElement: true, SVGTextPositioningElement: true, SVGTitleElement: true, SVGUseElement: true, SVGViewElement: true, SVGGradientElement: true, SVGComponentTransferFunctionElement: true, SVGFEDropShadowElement: true, SVGMPathElement: true, Element: false, AbortPaymentEvent: true, AnimationEvent: true, AnimationPlaybackEvent: true, ApplicationCacheErrorEvent: true, BackgroundFetchClickEvent: true, BackgroundFetchEvent: true, BackgroundFetchFailEvent: true, BackgroundFetchedEvent: true, BeforeInstallPromptEvent: true, BeforeUnloadEvent: true, BlobEvent: true, CanMakePaymentEvent: true, ClipboardEvent: true, CloseEvent: true, CustomEvent: true, DeviceMotionEvent: true, DeviceOrientationEvent: true, ErrorEvent: true, ExtendableEvent: true, ExtendableMessageEvent: true, FetchEvent: true, FontFaceSetLoadEvent: true, ForeignFetchEvent: true, GamepadEvent: true, HashChangeEvent: true, InstallEvent: true, MediaEncryptedEvent: true, MediaKeyMessageEvent: true, MediaQueryListEvent: true, MediaStreamEvent: true, MediaStreamTrackEvent: true, MessageEvent: true, MIDIConnectionEvent: true, MIDIMessageEvent: true, MutationEvent: true, NotificationEvent: true, PageTransitionEvent: true, PaymentRequestEvent: true, PaymentRequestUpdateEvent: true, PopStateEvent: true, PresentationConnectionAvailableEvent: true, PresentationConnectionCloseEvent: true, PromiseRejectionEvent: true, PushEvent: true, RTCDataChannelEvent: true, RTCDTMFToneChangeEvent: true, RTCPeerConnectionIceEvent: true, RTCTrackEvent: true, SecurityPolicyViolationEvent: true, SensorErrorEvent: true, SpeechRecognitionError: true, SpeechRecognitionEvent: true, SpeechSynthesisEvent: true, StorageEvent: true, SyncEvent: true, TrackEvent: true, TransitionEvent: true, WebKitTransitionEvent: true, VRDeviceEvent: true, VRDisplayEvent: true, VRSessionEvent: true, MojoInterfaceRequestEvent: true, USBConnectionEvent: true, IDBVersionChangeEvent: true, AudioProcessingEvent: true, OfflineAudioCompletionEvent: true, WebGLContextEvent: true, Event: false, InputEvent: false, SubmitEvent: false, EventTarget: false, HTMLFormElement: true, HTMLCollection: true, HTMLFormControlsCollection: true, HTMLOptionsCollection: true, XMLHttpRequest: true, XMLHttpRequestEventTarget: false, HTMLInputElement: true, MouseEvent: true, DragEvent: true, PointerEvent: true, WheelEvent: true, Document: true, DocumentFragment: true, HTMLDocument: true, ShadowRoot: true, XMLDocument: true, Attr: true, DocumentType: true, Node: false, ProgressEvent: true, ResourceProgressEvent: true, HTMLSelectElement: true, HTMLTableCellElement: true, HTMLTableDataCellElement: true, HTMLTableHeaderCellElement: true, HTMLTableSectionElement: true, CompositionEvent: true, FocusEvent: true, KeyboardEvent: true, TextEvent: true, TouchEvent: true, UIEvent: false, Window: true, DOMWindow: true});
+    hunkHelpers.setOrUpdateInterceptorsByTag({DOMError: J.JavaScriptObject, MediaError: J.JavaScriptObject, NavigatorUserMediaError: J.JavaScriptObject, OverconstrainedError: J.JavaScriptObject, PositionError: J.JavaScriptObject, GeolocationPositionError: J.JavaScriptObject, ArrayBufferView: A.NativeTypedData, Int8Array: A.NativeInt8List, Uint8Array: A.NativeUint8List, HTMLAudioElement: A.HtmlElement, HTMLBRElement: A.HtmlElement, HTMLBaseElement: A.HtmlElement, HTMLBodyElement: A.HtmlElement, HTMLCanvasElement: A.HtmlElement, HTMLContentElement: A.HtmlElement, HTMLDListElement: A.HtmlElement, HTMLDataElement: A.HtmlElement, HTMLDataListElement: A.HtmlElement, HTMLDetailsElement: A.HtmlElement, HTMLDialogElement: A.HtmlElement, HTMLDivElement: A.HtmlElement, HTMLEmbedElement: A.HtmlElement, HTMLFieldSetElement: A.HtmlElement, HTMLHRElement: A.HtmlElement, HTMLHeadElement: A.HtmlElement, HTMLHeadingElement: A.HtmlElement, HTMLHtmlElement: A.HtmlElement, HTMLIFrameElement: A.HtmlElement, HTMLImageElement: A.HtmlElement, HTMLLIElement: A.HtmlElement, HTMLLabelElement: A.HtmlElement, HTMLLegendElement: A.HtmlElement, HTMLLinkElement: A.HtmlElement, HTMLMapElement: A.HtmlElement, HTMLMediaElement: A.HtmlElement, HTMLMenuElement: A.HtmlElement, HTMLMetaElement: A.HtmlElement, HTMLMeterElement: A.HtmlElement, HTMLModElement: A.HtmlElement, HTMLOListElement: A.HtmlElement, HTMLObjectElement: A.HtmlElement, HTMLOptGroupElement: A.HtmlElement, HTMLOptionElement: A.HtmlElement, HTMLOutputElement: A.HtmlElement, HTMLParagraphElement: A.HtmlElement, HTMLParamElement: A.HtmlElement, HTMLPictureElement: A.HtmlElement, HTMLPreElement: A.HtmlElement, HTMLProgressElement: A.HtmlElement, HTMLQuoteElement: A.HtmlElement, HTMLScriptElement: A.HtmlElement, HTMLShadowElement: A.HtmlElement, HTMLSlotElement: A.HtmlElement, HTMLSourceElement: A.HtmlElement, HTMLSpanElement: A.HtmlElement, HTMLStyleElement: A.HtmlElement, HTMLTableCaptionElement: A.HtmlElement, HTMLTableColElement: A.HtmlElement, HTMLTableElement: A.HtmlElement, HTMLTableRowElement: A.HtmlElement, HTMLTemplateElement: A.HtmlElement, HTMLTextAreaElement: A.HtmlElement, HTMLTimeElement: A.HtmlElement, HTMLTitleElement: A.HtmlElement, HTMLTrackElement: A.HtmlElement, HTMLUListElement: A.HtmlElement, HTMLUnknownElement: A.HtmlElement, HTMLVideoElement: A.HtmlElement, HTMLDirectoryElement: A.HtmlElement, HTMLFontElement: A.HtmlElement, HTMLFrameElement: A.HtmlElement, HTMLFrameSetElement: A.HtmlElement, HTMLMarqueeElement: A.HtmlElement, HTMLElement: A.HtmlElement, HTMLAnchorElement: A.AnchorElement, HTMLAreaElement: A.AreaElement, HTMLButtonElement: A.ButtonElement, CDATASection: A.CharacterData, CharacterData: A.CharacterData, Comment: A.CharacterData, ProcessingInstruction: A.CharacterData, Text: A.CharacterData, DOMException: A.DomException, MathMLElement: A.Element, SVGAElement: A.Element, SVGAnimateElement: A.Element, SVGAnimateMotionElement: A.Element, SVGAnimateTransformElement: A.Element, SVGAnimationElement: A.Element, SVGCircleElement: A.Element, SVGClipPathElement: A.Element, SVGDefsElement: A.Element, SVGDescElement: A.Element, SVGDiscardElement: A.Element, SVGEllipseElement: A.Element, SVGFEBlendElement: A.Element, SVGFEColorMatrixElement: A.Element, SVGFEComponentTransferElement: A.Element, SVGFECompositeElement: A.Element, SVGFEConvolveMatrixElement: A.Element, SVGFEDiffuseLightingElement: A.Element, SVGFEDisplacementMapElement: A.Element, SVGFEDistantLightElement: A.Element, SVGFEFloodElement: A.Element, SVGFEFuncAElement: A.Element, SVGFEFuncBElement: A.Element, SVGFEFuncGElement: A.Element, SVGFEFuncRElement: A.Element, SVGFEGaussianBlurElement: A.Element, SVGFEImageElement: A.Element, SVGFEMergeElement: A.Element, SVGFEMergeNodeElement: A.Element, SVGFEMorphologyElement: A.Element, SVGFEOffsetElement: A.Element, SVGFEPointLightElement: A.Element, SVGFESpecularLightingElement: A.Element, SVGFESpotLightElement: A.Element, SVGFETileElement: A.Element, SVGFETurbulenceElement: A.Element, SVGFilterElement: A.Element, SVGForeignObjectElement: A.Element, SVGGElement: A.Element, SVGGeometryElement: A.Element, SVGGraphicsElement: A.Element, SVGImageElement: A.Element, SVGLineElement: A.Element, SVGLinearGradientElement: A.Element, SVGMarkerElement: A.Element, SVGMaskElement: A.Element, SVGMetadataElement: A.Element, SVGPathElement: A.Element, SVGPatternElement: A.Element, SVGPolygonElement: A.Element, SVGPolylineElement: A.Element, SVGRadialGradientElement: A.Element, SVGRectElement: A.Element, SVGScriptElement: A.Element, SVGSetElement: A.Element, SVGStopElement: A.Element, SVGStyleElement: A.Element, SVGElement: A.Element, SVGSVGElement: A.Element, SVGSwitchElement: A.Element, SVGSymbolElement: A.Element, SVGTSpanElement: A.Element, SVGTextContentElement: A.Element, SVGTextElement: A.Element, SVGTextPathElement: A.Element, SVGTextPositioningElement: A.Element, SVGTitleElement: A.Element, SVGUseElement: A.Element, SVGViewElement: A.Element, SVGGradientElement: A.Element, SVGComponentTransferFunctionElement: A.Element, SVGFEDropShadowElement: A.Element, SVGMPathElement: A.Element, Element: A.Element, AbortPaymentEvent: A.Event, AnimationEvent: A.Event, AnimationPlaybackEvent: A.Event, ApplicationCacheErrorEvent: A.Event, BackgroundFetchClickEvent: A.Event, BackgroundFetchEvent: A.Event, BackgroundFetchFailEvent: A.Event, BackgroundFetchedEvent: A.Event, BeforeInstallPromptEvent: A.Event, BeforeUnloadEvent: A.Event, BlobEvent: A.Event, CanMakePaymentEvent: A.Event, ClipboardEvent: A.Event, CloseEvent: A.Event, CustomEvent: A.Event, DeviceMotionEvent: A.Event, DeviceOrientationEvent: A.Event, ErrorEvent: A.Event, ExtendableEvent: A.Event, ExtendableMessageEvent: A.Event, FetchEvent: A.Event, FontFaceSetLoadEvent: A.Event, ForeignFetchEvent: A.Event, GamepadEvent: A.Event, HashChangeEvent: A.Event, InstallEvent: A.Event, MediaEncryptedEvent: A.Event, MediaKeyMessageEvent: A.Event, MediaQueryListEvent: A.Event, MediaStreamEvent: A.Event, MediaStreamTrackEvent: A.Event, MessageEvent: A.Event, MIDIConnectionEvent: A.Event, MIDIMessageEvent: A.Event, MutationEvent: A.Event, NotificationEvent: A.Event, PageTransitionEvent: A.Event, PaymentRequestEvent: A.Event, PaymentRequestUpdateEvent: A.Event, PopStateEvent: A.Event, PresentationConnectionAvailableEvent: A.Event, PresentationConnectionCloseEvent: A.Event, PromiseRejectionEvent: A.Event, PushEvent: A.Event, RTCDataChannelEvent: A.Event, RTCDTMFToneChangeEvent: A.Event, RTCPeerConnectionIceEvent: A.Event, RTCTrackEvent: A.Event, SecurityPolicyViolationEvent: A.Event, SensorErrorEvent: A.Event, SpeechRecognitionError: A.Event, SpeechRecognitionEvent: A.Event, SpeechSynthesisEvent: A.Event, StorageEvent: A.Event, SyncEvent: A.Event, TrackEvent: A.Event, TransitionEvent: A.Event, WebKitTransitionEvent: A.Event, VRDeviceEvent: A.Event, VRDisplayEvent: A.Event, VRSessionEvent: A.Event, MojoInterfaceRequestEvent: A.Event, USBConnectionEvent: A.Event, IDBVersionChangeEvent: A.Event, AudioProcessingEvent: A.Event, OfflineAudioCompletionEvent: A.Event, WebGLContextEvent: A.Event, Event: A.Event, InputEvent: A.Event, SubmitEvent: A.Event, EventTarget: A.EventTarget, HTMLFormElement: A.FormElement, HTMLCollection: A.HtmlCollection, HTMLFormControlsCollection: A.HtmlCollection, HTMLOptionsCollection: A.HtmlCollection, XMLHttpRequest: A.HttpRequest, XMLHttpRequestEventTarget: A.HttpRequestEventTarget, HTMLInputElement: A.InputElement, MouseEvent: A.MouseEvent, DragEvent: A.MouseEvent, PointerEvent: A.MouseEvent, WheelEvent: A.MouseEvent, Document: A.Node, DocumentFragment: A.Node, HTMLDocument: A.Node, ShadowRoot: A.Node, XMLDocument: A.Node, Attr: A.Node, DocumentType: A.Node, Node: A.Node, ProgressEvent: A.ProgressEvent, ResourceProgressEvent: A.ProgressEvent, HTMLSelectElement: A.SelectElement, HTMLTableCellElement: A.TableCellElement, HTMLTableDataCellElement: A.TableCellElement, HTMLTableHeaderCellElement: A.TableCellElement, HTMLTableSectionElement: A.TableSectionElement, CompositionEvent: A.UIEvent, FocusEvent: A.UIEvent, KeyboardEvent: A.UIEvent, TextEvent: A.UIEvent, TouchEvent: A.UIEvent, UIEvent: A.UIEvent, Window: A.Window, DOMWindow: A.Window});
+    hunkHelpers.setOrUpdateLeafTags({DOMError: true, MediaError: true, NavigatorUserMediaError: true, OverconstrainedError: true, PositionError: true, GeolocationPositionError: true, ArrayBufferView: false, Int8Array: true, Uint8Array: false, HTMLAudioElement: true, HTMLBRElement: true, HTMLBaseElement: true, HTMLBodyElement: true, HTMLCanvasElement: true, HTMLContentElement: true, HTMLDListElement: true, HTMLDataElement: true, HTMLDataListElement: true, HTMLDetailsElement: true, HTMLDialogElement: true, HTMLDivElement: true, HTMLEmbedElement: true, HTMLFieldSetElement: true, HTMLHRElement: true, HTMLHeadElement: true, HTMLHeadingElement: true, HTMLHtmlElement: true, HTMLIFrameElement: true, HTMLImageElement: true, HTMLLIElement: true, HTMLLabelElement: true, HTMLLegendElement: true, HTMLLinkElement: true, HTMLMapElement: true, HTMLMediaElement: true, HTMLMenuElement: true, HTMLMetaElement: true, HTMLMeterElement: true, HTMLModElement: true, HTMLOListElement: true, HTMLObjectElement: true, HTMLOptGroupElement: true, HTMLOptionElement: true, HTMLOutputElement: true, HTMLParagraphElement: true, HTMLParamElement: true, HTMLPictureElement: true, HTMLPreElement: true, HTMLProgressElement: true, HTMLQuoteElement: true, HTMLScriptElement: true, HTMLShadowElement: true, HTMLSlotElement: true, HTMLSourceElement: true, HTMLSpanElement: true, HTMLStyleElement: true, HTMLTableCaptionElement: true, HTMLTableColElement: true, HTMLTableElement: true, HTMLTableRowElement: true, HTMLTemplateElement: true, HTMLTextAreaElement: true, HTMLTimeElement: true, HTMLTitleElement: true, HTMLTrackElement: true, HTMLUListElement: true, HTMLUnknownElement: true, HTMLVideoElement: true, HTMLDirectoryElement: true, HTMLFontElement: true, HTMLFrameElement: true, HTMLFrameSetElement: true, HTMLMarqueeElement: true, HTMLElement: false, HTMLAnchorElement: true, HTMLAreaElement: true, HTMLButtonElement: true, CDATASection: true, CharacterData: true, Comment: true, ProcessingInstruction: true, Text: true, DOMException: true, MathMLElement: true, SVGAElement: true, SVGAnimateElement: true, SVGAnimateMotionElement: true, SVGAnimateTransformElement: true, SVGAnimationElement: true, SVGCircleElement: true, SVGClipPathElement: true, SVGDefsElement: true, SVGDescElement: true, SVGDiscardElement: true, SVGEllipseElement: true, SVGFEBlendElement: true, SVGFEColorMatrixElement: true, SVGFEComponentTransferElement: true, SVGFECompositeElement: true, SVGFEConvolveMatrixElement: true, SVGFEDiffuseLightingElement: true, SVGFEDisplacementMapElement: true, SVGFEDistantLightElement: true, SVGFEFloodElement: true, SVGFEFuncAElement: true, SVGFEFuncBElement: true, SVGFEFuncGElement: true, SVGFEFuncRElement: true, SVGFEGaussianBlurElement: true, SVGFEImageElement: true, SVGFEMergeElement: true, SVGFEMergeNodeElement: true, SVGFEMorphologyElement: true, SVGFEOffsetElement: true, SVGFEPointLightElement: true, SVGFESpecularLightingElement: true, SVGFESpotLightElement: true, SVGFETileElement: true, SVGFETurbulenceElement: true, SVGFilterElement: true, SVGForeignObjectElement: true, SVGGElement: true, SVGGeometryElement: true, SVGGraphicsElement: true, SVGImageElement: true, SVGLineElement: true, SVGLinearGradientElement: true, SVGMarkerElement: true, SVGMaskElement: true, SVGMetadataElement: true, SVGPathElement: true, SVGPatternElement: true, SVGPolygonElement: true, SVGPolylineElement: true, SVGRadialGradientElement: true, SVGRectElement: true, SVGScriptElement: true, SVGSetElement: true, SVGStopElement: true, SVGStyleElement: true, SVGElement: true, SVGSVGElement: true, SVGSwitchElement: true, SVGSymbolElement: true, SVGTSpanElement: true, SVGTextContentElement: true, SVGTextElement: true, SVGTextPathElement: true, SVGTextPositioningElement: true, SVGTitleElement: true, SVGUseElement: true, SVGViewElement: true, SVGGradientElement: true, SVGComponentTransferFunctionElement: true, SVGFEDropShadowElement: true, SVGMPathElement: true, Element: false, AbortPaymentEvent: true, AnimationEvent: true, AnimationPlaybackEvent: true, ApplicationCacheErrorEvent: true, BackgroundFetchClickEvent: true, BackgroundFetchEvent: true, BackgroundFetchFailEvent: true, BackgroundFetchedEvent: true, BeforeInstallPromptEvent: true, BeforeUnloadEvent: true, BlobEvent: true, CanMakePaymentEvent: true, ClipboardEvent: true, CloseEvent: true, CustomEvent: true, DeviceMotionEvent: true, DeviceOrientationEvent: true, ErrorEvent: true, ExtendableEvent: true, ExtendableMessageEvent: true, FetchEvent: true, FontFaceSetLoadEvent: true, ForeignFetchEvent: true, GamepadEvent: true, HashChangeEvent: true, InstallEvent: true, MediaEncryptedEvent: true, MediaKeyMessageEvent: true, MediaQueryListEvent: true, MediaStreamEvent: true, MediaStreamTrackEvent: true, MessageEvent: true, MIDIConnectionEvent: true, MIDIMessageEvent: true, MutationEvent: true, NotificationEvent: true, PageTransitionEvent: true, PaymentRequestEvent: true, PaymentRequestUpdateEvent: true, PopStateEvent: true, PresentationConnectionAvailableEvent: true, PresentationConnectionCloseEvent: true, PromiseRejectionEvent: true, PushEvent: true, RTCDataChannelEvent: true, RTCDTMFToneChangeEvent: true, RTCPeerConnectionIceEvent: true, RTCTrackEvent: true, SecurityPolicyViolationEvent: true, SensorErrorEvent: true, SpeechRecognitionError: true, SpeechRecognitionEvent: true, SpeechSynthesisEvent: true, StorageEvent: true, SyncEvent: true, TrackEvent: true, TransitionEvent: true, WebKitTransitionEvent: true, VRDeviceEvent: true, VRDisplayEvent: true, VRSessionEvent: true, MojoInterfaceRequestEvent: true, USBConnectionEvent: true, IDBVersionChangeEvent: true, AudioProcessingEvent: true, OfflineAudioCompletionEvent: true, WebGLContextEvent: true, Event: false, InputEvent: false, SubmitEvent: false, EventTarget: false, HTMLFormElement: true, HTMLCollection: true, HTMLFormControlsCollection: true, HTMLOptionsCollection: true, XMLHttpRequest: true, XMLHttpRequestEventTarget: false, HTMLInputElement: true, MouseEvent: true, DragEvent: true, PointerEvent: true, WheelEvent: true, Document: true, DocumentFragment: true, HTMLDocument: true, ShadowRoot: true, XMLDocument: true, Attr: true, DocumentType: true, Node: false, ProgressEvent: true, ResourceProgressEvent: true, HTMLSelectElement: true, HTMLTableCellElement: true, HTMLTableDataCellElement: true, HTMLTableHeaderCellElement: true, HTMLTableSectionElement: true, CompositionEvent: true, FocusEvent: true, KeyboardEvent: true, TextEvent: true, TouchEvent: true, UIEvent: false, Window: true, DOMWindow: true});
+    A.NativeTypedArray.$nativeSuperclassTag = "ArrayBufferView";
+    A._NativeTypedArrayOfInt_NativeTypedArray_ListMixin.$nativeSuperclassTag = "ArrayBufferView";
+    A._NativeTypedArrayOfInt_NativeTypedArray_ListMixin_FixedLengthListMixin.$nativeSuperclassTag = "ArrayBufferView";
+    A.NativeTypedArrayOfInt.$nativeSuperclassTag = "ArrayBufferView";
   })();
   Function.prototype.call$0 = function() {
     return this();

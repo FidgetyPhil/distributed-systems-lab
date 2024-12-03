@@ -32,13 +32,33 @@ func connectToDatabase() {
 	}
 
 	log.Println("Connected to the database")
+
+	// Tabelle erstellen, falls sie nicht existiert
+	createTableIfNotExists()
+}
+
+// Tabelle erstellen, falls sie nicht existiert
+func createTableIfNotExists() {
+	query := `
+	CREATE TABLE IF NOT EXISTS items (
+		name TEXT PRIMARY KEY,
+		amount INTEGER NOT NULL
+	);
+	`
+
+	_, err := db.Exec(query)
+	if err != nil {
+		log.Fatalf("Error creating table: %v\n", err)
+	}
+
+	log.Println("Table 'items' is ready.")
 }
 
 // Middleware für CORS
 func enableCORS(w http.ResponseWriter) {
-	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Origin", "*") // Erlaubt alle Ursprünge
 	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
 }
 
 // Startpunkt der Anwendung
@@ -51,15 +71,15 @@ func main() {
 	http.HandleFunc("/items", handleItems)
 	http.HandleFunc("/items/", handleItemByName)
 
-	log.Println("Starting server on HTTPS :8080...")
-	log.Fatal(http.ListenAndServeTLS(":8080", "cert.pem", "key.pem", nil))
-
+	log.Println("Starting server on :8080...")
+	log.Fatal(http.ListenAndServe(":8080", nil))
 }
 
 // Handler für die Route "/items"
 func handleItems(w http.ResponseWriter, r *http.Request) {
 	enableCORS(w)
 	if r.Method == http.MethodOptions {
+		// Stelle sicher, dass Preflight-Anfragen erfolgreich beantwortet werden
 		w.WriteHeader(http.StatusOK)
 		return
 	}

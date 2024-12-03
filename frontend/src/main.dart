@@ -1,11 +1,21 @@
 import 'dart:convert';
 import 'dart:html';
 
-final String backendUrl = 'https://glowing-memory-q5jx4v9pqgp24wr9-8080.app.github.dev';
+final backendUrl = (() {
+  final currentUrl = Uri.base;
 
-String resolveBackendUrl(String path) {
-  return Uri.parse(backendUrl).resolve(path).toString();
-}
+  // Extrahiere Host und prüfe, ob es sich um eine Codespaces-URL handelt
+  final host = currentUrl.host;
+  if (host.contains('.app.github.dev')) {
+    // Zerlege die Subdomain und ersetze den Port-Teil
+    final regex = RegExp(r'-(\d+)\.app\.github\.dev$');
+    final match = regex.firstMatch(host);
+    if (match != null) {
+      final backendHost = host.replaceFirst('-${match.group(1)}', '-8080');
+      return currentUrl.replace(host: backendHost, port: null, path: '').toString();
+    }
+  }
+})();
 
 void main() {
   final itemNameInput = querySelector('#item-name') as InputElement;
@@ -94,8 +104,6 @@ Future<void> loadItems(TableSectionElement tableBody) async {
     window.alert('Fehler beim Laden der Artikel: $e');
   }
 }
-
-
 
 void renderItemsTable(TableSectionElement tableBody, List<Map<String, dynamic>> items) {
   tableBody.children.clear();

@@ -1,25 +1,9 @@
-A bare-bones Dart web app.
+sudo apt-get update
 
-Uses [`package:web`](https://pub.dev/packages/web)
-to interop with JS and the DOM.
+sudo apt-get install -y apt-transport-https
+wget -qO- https://dl-ssl.google.com/linux/linux_signing_key.pub | sudo gpg --dearmor -o /usr/share/keyrings/dart-archive-keyring.gpg
+echo "deb [signed-by=/usr/share/keyrings/dart-archive-keyring.gpg] https://storage.googleapis.com/download.dartlang.org/linux/debian stable main" | sudo tee /etc/apt/sources.list.d/dart_stable.list
 
-## Running and building
+sudo apt-get install -y dart
 
-To run the app,
-activate and use [`package:webdev`](https://dart.dev/tools/webdev):
-
-```
-dart pub global activate webdev
-export PATH="$PATH":"$HOME/.pub-cache/bin"
-webdev serve
-```
-
-To build a production version ready for deployment,
-use the `webdev build` command:
-
-```
-webdev build
-```
-
-To learn how to interop with web APIs and other JS libraries,
-check out https://dart.dev/interop/js-interop.
+docker compose up --build
