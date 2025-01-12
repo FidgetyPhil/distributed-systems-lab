@@ -1,10 +1,9 @@
 import 'dart:convert';
 import 'dart:html';
 
+// Codespace URL Grabber
 final backendUrl = (() {
   final currentUrl = Uri.base;
-
-  // Extrahiere Host und prüfe, ob es sich um eine Codespaces-URL handelt
   final host = currentUrl.host;
   if (host.contains('.app.github.dev')) {
     // Zerlege die Subdomain und ersetze den Port-Teil

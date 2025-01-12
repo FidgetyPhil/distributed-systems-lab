@@ -3,13 +3,14 @@ package main
 import (
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"log"
+	"os"
 	"net/http"
 
-	_ "github.com/lib/pq" // Importiert den PostgreSQL-Treiber für database/sql
+	_ "github.com/lib/pq"
 )
 
-// Item-Struktur für JSON-Daten
 type Item struct {
 	Name   string `json:"name"`
 	Amount int    `json:"amount"`
@@ -20,7 +21,22 @@ var db *sql.DB
 // Verbindung zur PostgreSQL-Datenbank herstellen
 func connectToDatabase() {
 	var err error
-	connStr := "postgres://hse24:password@shoppingdb-container:5432/shoppingdb?sslmode=disable"
+
+	// Daten aus Umgebungsvariablen beziehen
+	dbHost := os.Getenv("DB_HOST")
+	dbUser := os.Getenv("DB_USER")
+	dbPassword := os.Getenv("DB_PASSWORD")
+	dbName := os.Getenv("DB_NAME")
+
+	// Fallback für fehlende Umgebungsvariablen
+	if dbHost == "" || dbUser == "" || dbPassword == "" || dbName == "" {
+		log.Fatalf("Database configuration incomplete. Ensure DB_HOST, DB_USER, DB_PASSWORD, and DB_NAME are set.")
+	}
+
+	// Verbindungskonfigurationszeichenkette erstellen
+	connStr := fmt.Sprintf("postgres://%s:%s@%s:5432/%s?sslmode=disable", dbUser, dbPassword, dbHost, dbName)
+
+	// Verbindung zur Datenbank öffnen
 	db, err = sql.Open("postgres", connStr)
 	if err != nil {
 		log.Fatalf("Unable to connect to database: %v\n", err)

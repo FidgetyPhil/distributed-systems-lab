@@ -1,7 +1,6 @@
 version: '3.8'
 
 services:
-
   shoppingdb:
     container_name: shoppingdb-container
     image: postgres
@@ -13,22 +12,28 @@ services:
       - "5432:5432"
     volumes:
       - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hse24"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
+    container_name: backend-container
     ports:
       - "8080:8080"
-    container_name: backend-container
     environment:
-      DB_HOST: shoppingdb-container
+      DB_HOST: shoppingdb
       DB_PORT: 5432
       DB_USER: hse24
       DB_PASSWORD: password
       DB_NAME: shoppingdb
     depends_on:
-      - shoppingdb
+      shoppingdb:
+        condition: service_healthy
 
   frontend:
     build:
@@ -42,4 +47,3 @@ services:
 
 volumes:
   db_data:
-
