@@ -9,4 +9,4 @@ spec:
     targetPort: 8080
   selector:
     app: backend
-  type: ClusterIP  # Nur intern verfügbar
+  type: ClusterIP

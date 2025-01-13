@@ -1,5 +1,7 @@
 # Distributed Systems Lab Documentation
 
+## This Application is desired to be used in a GitHub Codespace!
+
 # How to start the App using Docker
 
 #### Install Docker in your Codespace
@@ -9,10 +11,10 @@
 Run:
 #### docker compose up --build
 
-and after build process run:
+### To avoid CORS blocking you have to use the open-backend-port Script:
 
-#### chmod +x open-port.sh
-#### ./open-port.sh
+#### chmod +x open-backend-port.sh
+#### ./open-backend-port.sh
 
 ## Stop and Remove all Containers
 
@@ -27,6 +29,18 @@ Grant privileges to use the script:
 Run the starting Script:
 
 ##### ./kubernetes_starter.sh
+
+## Right after, forward the following ports: (Use in different Terminals)
+
+kubectl port-forward -n shopping-app-namespace service/backend 8080:8080
+kubectl port-forward -n shopping-app-namespace service/frontend 30081:80
+
+## To avoid CORS blocking you have to use the open-backend-port Script:
+
+Use
+#### chmod +x open-backend-port.sh
+to grant privileges first! Then run:
+#### ./open-backend-port.sh
 
 ## Checking Pod Health with:
 
