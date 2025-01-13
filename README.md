@@ -14,8 +14,6 @@ Set Port 8080 to "Public" (CORS Problems)
 
 #### docker compose down
 
-In the end open the backend port 8080 to "public" in the Port Window.
-
 # How to start with Kubernetes:
 
 Grant privileges to use the script:
@@ -24,7 +22,11 @@ Grant privileges to use the script:
 
 Run the starting Script:
 
-##### ./start_kubernetes.sh
+##### ./kubernetes_starter.sh
+
+## Checking Pod Health with:
+
+#### kubectl get all -n shopping-app-namespace
 
 To delete the kubernetes config use:
 
@@ -34,4 +36,15 @@ To delete the minikube cluster use:
 
 #### minikube delete
 
-# Happy Shopping!
+## Database connection and Commands
+
+To connect to the database use:
+### docker exec -it shoppingdb-container psql -U hse24 -d shoppingdb
+
+To list tables use:
+### /dt
+
+To end the database connection use:
+### \q
+
+## Happy Shopping!
