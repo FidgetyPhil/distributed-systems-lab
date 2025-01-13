@@ -6,9 +6,13 @@
 
 ## Building and Starting your Containers
 
+Run:
 #### docker compose up --build
 
-Set Port 8080 to "Public" (CORS Problems)
+and after build process run:
+
+#### chmod +x open-port.sh
+#### ./open-port.sh
 
 ## Stop and Remove all Containers
 
@@ -18,7 +22,7 @@ Set Port 8080 to "Public" (CORS Problems)
 
 Grant privileges to use the script:
 
-#### chmod +x start_kubernetes.sh
+#### chmod +x kubernetes_starter.sh
 
 Run the starting Script:
 
